@@ -12,7 +12,7 @@
 //   technisch optional: Ist BURP_PROXY_URL gesetzt (siehe .env.example), muss Burp laufen (Intercept aus).
 //   Ohne BURP_PROXY_URL läuft das Programm ohne Proxy und du siehst nichts in Burp.
 //   Burp Community: https://portswigger.net/burp/communitydownload
-//   CA-Zertifikat (nur HTTPS, ab Lektion 02, Teil 2): https://portswigger.net/burp/documentation/desktop/external-browser-config/certificate (nur exportieren, nicht im Browser installieren; siehe README)
+//   CA-Zertifikat (nur HTTPS, ab Lektion 02, Teil 2): https://portswigger.net/burp/documentation/desktop/external-browser-config/certificate (nur exportieren, nicht im Browser installieren; siehe README.de.md im Repo-Root)
 // Start: npm run l01:3   (oder Datei öffnen und F5 drücken)
 //
 // Aufgabe:

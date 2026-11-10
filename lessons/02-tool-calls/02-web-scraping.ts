@@ -9,7 +9,7 @@
 // Einordnung: Hier legt dein Code das Wissen selbst in den Prompt – die Vorstufe zu Tool-Calls, bei denen das Modell es ab Teil 3 selbst anfordert.
 //
 // Voraussetzungen: LM Studio (Chat-Modell geladen, Server gestartet) und Open WebUI laufen, Internetzugang. Burp ist optional: Ist BURP_PROXY_URL gesetzt, muss Burp laufen (Intercept aus).
-//   Mit Burp braucht dieser Teil BURP_CA_CERT (HTTPS-Webseite) – siehe README.
+//   Mit Burp braucht dieser Teil BURP_CA_CERT (HTTPS-Webseite) – siehe README.de.md im Repo-Root.
 //   Dann wird auch der Abruf von news.ycombinator.com über Burp geleitet.
 // Start: npm run l02:2   (oder Datei öffnen und F5 drücken)
 //

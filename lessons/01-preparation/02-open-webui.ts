@@ -4,8 +4,8 @@
 //
 // Open WebUI kann mit Ollama sprechen. Die Fassade (Facade) ist ein kleiner Server, der sich wie
 // Ollama verhält (Port FACADE_PORT) und jede Chat-Nachricht an unser Programm weiterreicht. So
-// erscheint dieses Programm in Open WebUI als Modell "lesson-01-part-2". Einrichtung von Open WebUI: siehe README.
-// Alles aus ../shared/ ist Infrastruktur – siehe lessons/shared/README.md.
+// erscheint dieses Programm in Open WebUI als Modell "lesson-01-part-2". Einrichtung von Open WebUI: siehe README.de.md im Repo-Root.
+// Alles aus ../shared/ ist Infrastruktur – siehe lessons/shared/README.de.md.
 //
 // Voraussetzungen: LM Studio läuft mit geladenem Chat-Modell, Server gestartet.
 //   Open WebUI läuft und zeigt auf die Fassade (Quick Start: https://docs.openwebui.com/getting-started/quick-start/).
@@ -42,7 +42,7 @@ async function main() {
 
   const app = express();
   logHttpRequests(app);
-  // `prepareFacade` richtet die Fassade ein (Infrastruktur, siehe shared/README.md).
+  // `prepareFacade` richtet die Fassade ein (Infrastruktur, siehe shared/README.de.md).
   prepareFacade(app);
   // NEU: Die Fassade gibt sich gegenüber Open WebUI als Ollama-Server aus.
   const ollamaApi = createOllamaApiFacade(app, model, ADVERTISED_MODEL);
