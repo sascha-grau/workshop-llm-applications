@@ -8,7 +8,7 @@ In diesem Workshop baust du in fünf Lektionen mit mehreren kleinen Teilen eine 
 
 ## Konventionen
 
-Die Dokumentation gibt es auf Englisch (README.md) und Deutsch (README.de.md). Code-Kommentare sowie Lernziel und Aufgabe am Anfang jeder Lektionsdatei sind deutsch. Bezeichner, Felder und Log- und Fehlermeldungen sind englisch, wie im Code üblich. Prompts an das Modell und Chat-Antworten in Open WebUI sind deutsch, weil das Quellmaterial (die deutsche OWASP-Ausgabe) deutsch ist. Fehlermeldungen in der Fehlersuche unten stehen im englischen Originalwortlaut. Die englischen Lektions-READMEs enthalten zusätzlich die Aufgaben und Grundbegriffe auf Englisch; maßgeblich sind die Dateiköpfe.
+Die Dokumentation gibt es auf Englisch (README.md) und Deutsch (README.de.md). Code-Kommentare sowie Lernziel und Aufgabe am Anfang jeder Lektionsdatei sind deutsch. Bezeichner, Felder und Log- und Fehlermeldungen sind englisch, wie im Code üblich. Prompts an das Modell und Chat-Antworten in Open WebUI sind deutsch, weil das Quellmaterial (die deutsche OWASP-Ausgabe) deutsch ist. Fehlermeldungen in der Fehlersuche unten stehen im englischen Originalwortlaut. Die Lektions-READMEs enthalten in beiden Sprachen Grundbegriffe und Aufgaben; die Aufgaben wiederholen die Dateiköpfe, die maßgeblich bleiben. Hinweise zur Chat-Sprache gibt es nur in den englischen Lektions-READMEs.
 
 **TypeScript in fünf Zeilen:** Die Dateien sind TypeScript, du liest sie wie JavaScript mit ein paar Zusätzen.
 
