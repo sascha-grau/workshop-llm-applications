@@ -1,0 +1,18 @@
+{
+  // Es gibt keinen Build-Schritt: Node führt die .ts-Dateien direkt aus und entfernt dabei nur die
+  // Typen. Diese Konfiguration steuert nur die Typprüfung im Editor (und `npm run typecheck`).
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "noEmit": true,
+    // Node verlangt die Endung .ts in relativen Imports; TypeScript muss man sagen, dass das erlaubt ist.
+    "allowImportingTsExtensions": true,
+    // Nur Syntax erlauben, die Node durch bloßes Entfernen der Typen versteht (keine enums, keine namespaces).
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["lessons"]
+}

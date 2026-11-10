@@ -1,0 +1,48 @@
+{
+  "dependencies": {
+    "@langchain/openai": "^1.8.2",
+    "cheerio": "^1.2.0",
+    "express": "^5.3.0",
+    "langchain": "^1.6.3",
+    "ollama-api-facade-js": "1.0.7",
+    "undici": "^8.12.4",
+    "zod": "^4.6.7"
+  },
+  "name": "llm-workshop",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "l01:1": "node --env-file-if-exists=.env lessons/01-preparation/01-hello-llm.ts",
+    "l01:2": "node --env-file-if-exists=.env lessons/01-preparation/02-open-webui.ts",
+    "l01:3": "node --env-file-if-exists=.env lessons/01-preparation/03-burp-proxy.ts",
+    "l02:1": "node --env-file-if-exists=.env lessons/02-tool-calls/01-knowledge-and-few-shot.ts",
+    "l02:2": "node --env-file-if-exists=.env lessons/02-tool-calls/02-web-scraping.ts",
+    "l02:3": "node --env-file-if-exists=.env lessons/02-tool-calls/03-tool-call-base.ts",
+    "l02:4": "node --env-file-if-exists=.env lessons/02-tool-calls/04-tool-calls-short.ts",
+    "l03:1": "node --env-file-if-exists=.env lessons/03-embeddings/01-hello-embeddings.ts",
+    "l03:2": "node --env-file-if-exists=.env lessons/03-embeddings/02-comparisons.ts",
+    "l03:3": "node --env-file-if-exists=.env lessons/03-embeddings/03-prefixes.ts",
+    "l04:0": "node --env-file-if-exists=.env lessons/04-chunking/00-prepare-chunks.ts",
+    "l04:1": "node --env-file-if-exists=.env lessons/04-chunking/01-prepared-chunks.ts",
+    "l04:2": "node --env-file-if-exists=.env lessons/04-chunking/02-heading-chunking.ts",
+    "l04:3": "node --env-file-if-exists=.env lessons/04-chunking/03-semantic-chunking.ts",
+    "l04:4": "node --env-file-if-exists=.env lessons/04-chunking/04-question-generation-chunking.ts",
+    "l05:1": "node --env-file-if-exists=.env lessons/05-rag/01-heading-rag.ts",
+    "l05:2": "node --env-file-if-exists=.env lessons/05-rag/02-semantic-rag.ts",
+    "l05:3": "node --env-file-if-exists=.env lessons/05-rag/03-question-generation-rag.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "typescript": "^7.0.2",
+    "@types/node": "^26.6.6"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "private": true
+}

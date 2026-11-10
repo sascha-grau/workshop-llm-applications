@@ -1,0 +1,8 @@
+{
+  "code-runner.executorMap": {
+    "typescript": "node --env-file-if-exists=\"$workspaceRoot/.env\" \"$fullFileName\"",
+    "javascript": "node --env-file-if-exists=\"$workspaceRoot/.env\" \"$fullFileName\""
+  },
+  "code-runner.runInTerminal": true,
+  "code-runner.saveFileBeforeRun": true
+}

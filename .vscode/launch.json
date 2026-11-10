@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // F5 startet die gerade geöffnete Lektions-Datei im Debugger. Node führt TypeScript direkt aus,
+      // es gibt keinen Build-Schritt, Haltepunkte bleiben also in den Originalzeilen.
+      "type": "node",
+      "request": "launch",
+      "name": "Run current file",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--env-file-if-exists=.env"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ]
+}

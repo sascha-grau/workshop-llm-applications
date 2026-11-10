@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.*
+*.pem
+*.der
+!.env.example
+indexes/
+content/owasp-genai-top-10/chunks/
+content/owasp-genai-top-10/.chunks-stage-*/
