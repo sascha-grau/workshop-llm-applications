@@ -6,7 +6,8 @@
  * eine Zeile mit `done: true`. Die Lektionen nutzen diese Funktion statt `asStream` der Fassade. Das
  * verwirft Stücke, die nur aus Leerraum bestehen (z. B. "\n\n"), und würde so die Absätze einer
  * Antwort zusammenschieben. `source` ist ein fertiger Text (wird in einem Stück gesendet) oder
- * ein Modell-Stream (wird Stück für Stück gesendet).
+ * ein Modell-Stream (wird Stück für Stück gesendet). Mit `options.footer` hängt die Funktion nach der
+ * Antwort noch einen festen Text an (die Quellenliste der RAG-Lektionen).
  */
 import type { Response } from 'express';
 import type { ChatHandler } from 'ollama-api-facade-js';
@@ -55,7 +56,10 @@ export function requestAbortSignal(chatResponse: Parameters<ChatHandler>[2]): Ab
   return controller.signal;
 }
 
-// TODO(doc): NDJSON mit optionalem Footer vor done: true senden; Abbruch und Rückstau (drain) beachten.
+// Sendet erst die Antwort, dann den optionalen `footer` (z. B. die Quellenliste) als letztes Stück und zuletzt
+// `done: true`. So hängt der Code Text deterministisch an, ohne dass das Modell ihn kennen muss. Bei Abbruch
+// (`signal`) hören wir sofort auf. Liefert `write` false, ist der Puffer voll: Dann warten wir auf `drain`
+// (Rückstau), statt Speicher mit unausgelieferten Stücken zu füllen.
 export async function sendChatStream(
   chatResponse: Parameters<ChatHandler>[2],
   source: string | AsyncIterable<{ text: string }>,

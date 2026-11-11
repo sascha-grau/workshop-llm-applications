@@ -4,7 +4,8 @@
 // `createRagAnswer`, Standard ist das einfache Top-k). Neu gegenüber einem einzelnen Modell:
 // `createRagApp` kann mehrere Pipelines unter verschiedenen Modellnamen anbieten (Teil 11), und
 // `startRag` startet sie. Die Suchfunktionen der einzelnen Strategien stehen in `retrieval.ts`
-// (im Speicher), `parent-document.ts` und `qdrant-retrieval.ts` (Qdrant).
+// (im Speicher), `parent-document.ts` und `qdrant-retrieval.ts` (Qdrant). Jede Antwort endet mit einer vom Code
+// angehängten Quellenliste (`formatSourceList`, `footer` in `sendChatStream`); das Modell zitiert nur mit [n].
 import express from 'express';
 import { ChatOpenAI } from '@langchain/openai';
 import { createOllamaApiFacade } from 'ollama-api-facade-js';
@@ -52,7 +53,9 @@ export function loadRagIndex(strategy: Strategy): RagEntry[] {
   return publicEntries;
 }
 
-// TODO(doc): Dieselbe Quellenbeschriftung und Nummerierung in Prompt-Kontext, Terminal-Log und Quellenliste verwenden.
+// Eine einzige Funktion beschriftet die Treffer für Prompt-Kontext, Terminal-Log (`RAG sources`) und die
+// angehängte Quellenliste. So passt jedes [n] in der Antwort zur Nummer in der Liste und im Log,
+// und die drei Stellen können nicht auseinanderlaufen.
 export function sourceLabelFor({ metadata }: RagSource, position: number): string {
   const source = `${metadata.source}${metadata.headingPath?.length ? ` · ${metadata.headingPath.join(HEADING_SEPARATOR)}` : ''}`;
   return `[${position + 1}] ${source}`;

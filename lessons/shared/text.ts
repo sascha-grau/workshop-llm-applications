@@ -6,7 +6,11 @@ export function stripJsonFence(text: string): string {
   return /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(trimmed)?.[1] ?? trimmed;
 }
 
-// TODO(doc): Quellenliste mit vorhandenen Nummern formatieren; Metadaten gegen Markdown und Zeilenumbrüche absichern.
+// Formatiert die Quellenliste, die der Code (nicht das Modell) an jede Antwort hängt: Kleine Modelle zitieren
+// unzuverlässig und erfinden Quellen. Die Nummern "[n] " kommen schon fertig aus `sourceLabelFor` und bleiben
+// unverändert, damit sie zu den [n] im Prompt und im Terminal-Log passen. Überschriften stammen aus Dokumenten,
+// also aus fremden Daten: Ohne Escaping könnte eine Überschrift wie "![x](http://…)" in Open WebUI zum Bild
+// oder Link werden (OWASP LLM05). Zeilenumbrüche würden zudem Listeneinträge zerreißen.
 export function formatSourceList(labels: string[]): string {
   if (labels.length === 0) return '\n\n---\n**Quellen:** keine passenden Treffer gefunden';
   const items = labels.map((label) => {

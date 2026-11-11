@@ -6,6 +6,7 @@
 // Rollen: `system` (Anweisung des Entwicklers, steht vor dem Gespräch), `user` (Mensch),
 // `assistant` (Modell). Few-Shot: erfundene Beispiel-Dialoge, die Format und Stil vormachen.
 // `temperature` steuert, wie zufällig die Wortwahl ist; 0 = möglichst gleichbleibend.
+// Die Antwort endet mit einer vom Code angehängten Quellenliste (siehe `formatSourceList`).
 // Einordnung: Hier legt dein Code das Wissen selbst in den Prompt – die Vorstufe zu Tool-Calls, bei denen das Modell es ab Teil 3 selbst anfordert.
 //
 // Voraussetzungen: LM Studio (Chat-Modell geladen, Server gestartet) und Open WebUI laufen. Burp ist optional: Ist BURP_PROXY_URL gesetzt, muss Burp laufen (Intercept aus).
@@ -79,7 +80,9 @@ ${knowledge}`;
   ollamaApi.postApiChat(async (chatRequest, chatModel, chatResponse) => {
     const signal = requestAbortSignal(chatResponse);
     await logInvocation('Model', { messages: chatRequest.messages.length }, async () => {
-      // TODO(doc): Anweisung, Beispiele und Gespräch anordnen; Hilfsanfragen ohne Few-Shot und Quellenliste beantworten.
+      // Reihenfolge: System-Prompt, Few-Shot-Beispiele, dann das echte Gespräch, damit das Modell den Stil zuerst sieht.
+      // Hilfsanfragen von Open WebUI (Titel, Tags) bekommen weder Few-Shot noch Quellenliste, sonst würde
+      // "(Quelle: Kontext)" im Titel landen und eine Liste an etwas hängen, das keine Antwort ist.
       // Ein System-Prompt aus Open WebUI wird mit unserem zusammengeführt, weil die meisten Modelle nur einen akzeptieren.
       // Achtung: Diese System-Prompts kommen vom Client und sind nicht vertrauenswürdig. Hier ist das in Ordnung,
       // weil du selbst der Nutzer bist. In einer Mehrbenutzer-Anwendung würdest du sie verwerfen;

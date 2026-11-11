@@ -6,6 +6,7 @@
 // die aktuelle Hacker-News-Startseite, höchstens einmal pro Minute. Nur die Titel gehen in den Prompt.
 // Das Kontextfenster ist die maximale Textmenge (in Tokens), die das Modell pro Anfrage sieht;
 // die ganze Seite wäre fast nur Markup und würde es unnötig füllen.
+// Die Antwort endet mit einer vom Code angehängten Quellenliste (die Hacker-News-Adresse).
 // Einordnung: Hier legt dein Code das Wissen selbst in den Prompt – die Vorstufe zu Tool-Calls, bei denen das Modell es ab Teil 3 selbst anfordert.
 //
 // Voraussetzungen: LM Studio (Chat-Modell geladen, Server gestartet) und Open WebUI laufen, Internetzugang. Burp ist optional: Ist BURP_PROXY_URL gesetzt, muss Burp laufen (Intercept aus).
