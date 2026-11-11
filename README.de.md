@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-In diesem Workshop baust du in fünf Lektionen mit mehreren kleinen Teilen eine LLM-Anwendung nach: vom ersten Aufruf eines Sprachmodells über einen Chat in Open WebUI, Werkzeugaufrufe und Embeddings bis zu einer Suche mit Quellenangaben (RAG) über die OWASP Top 10 für LLM-Anwendungen. Dabei schaust du mit Burp Suite jeder Anfrage zu, die dein Programm an das Modell schickt. Du brauchst etwas JavaScript, aber kein TypeScript-Wissen und keine Erfahrung mit LLM-Schnittstellen. Jeder Teil einer Lektion ist eine Datei, die mit einem Lernziel und einer Aufgabe beginnt.
+In diesem Workshop baust du in sieben Lektionen mit mehreren kleinen Teilen eine LLM-Anwendung nach: vom ersten Aufruf eines Sprachmodells über einen Chat in Open WebUI, Werkzeugaufrufe, Embeddings und Retrieval-Strategien bis zu einer Suche mit Quellenangaben (RAG) über die OWASP Top 10 für LLM-Anwendungen. Dabei schaust du mit Burp Suite jeder Anfrage zu, die dein Programm an das Modell schickt. Du brauchst etwas JavaScript, aber kein TypeScript-Wissen und keine Erfahrung mit LLM-Schnittstellen. Jeder Teil einer Lektion ist eine Datei, die mit einem Lernziel und einer Aufgabe beginnt.
 
 > **Inspiration und Dank:** Dieser Workshop ist stark vom heise-conferences-Workshop [KI mit eigenen Daten richtig umsetzen: RAG, Embeddings und Retrieval-Architekturen bewerten und anwenden](https://heise-conferences.de/workshop/ki-mit-eigenen-daten-richtig-umsetzen-rag-embeddings-und-retrieval-architekturen-bewerten-und-anwenden-UJS49IRR2iSa5D) inspiriert. Ein besonderer Dank geht an den Trainer Gregor Biswanger: [YouTube](https://youtube.com/GregorBiswanger) · [LinkedIn](https://www.linkedin.com/pub/gregor-biswanger/11/420/513).
 
@@ -27,8 +27,9 @@ Die Dokumentation gibt es auf Englisch (README.md) und Deutsch (README.de.md). C
 | Node.js 22.19 oder neuer | Führt die TypeScript-Dateien direkt aus, es gibt keinen Build-Schritt (`engines` in `package.json`). | [nodejs.org/en/download](https://nodejs.org/en/download) |
 | LM Studio | Lokaler Server für Chat- und Embedding-Modelle mit OpenAI-kompatibler Schnittstelle, Standardadresse `http://localhost:1234/v1`. | [lmstudio.ai](https://lmstudio.ai) · [Server](https://lmstudio.ai/docs/developer/core/server) · [OpenAI-Kompatibilität](https://lmstudio.ai/docs/developer/openai-compat) · [Embeddings](https://lmstudio.ai/docs/developer/openai-compat/embeddings) · [CLI `lms`](https://lmstudio.ai/docs/cli) |
 | Burp Suite Community | Ab Lektion 01, Teil 3: zeigt jede HTTP-Anfrage. Optional: ohne Burp lässt du `BURP_PROXY_URL` in `.env` leer (siehe Einrichtung). | [Download](https://portswigger.net/burp/communitydownload) · [CA-Zertifikat](https://portswigger.net/burp/documentation/desktop/external-browser-config/certificate) |
-| Open WebUI | Ab Lektion 01, Teil 2: Chat-Oberfläche für die Teile mit Chat (Lektion 01 ab Teil 2, Lektion 02 und 05). | [openwebui.com](https://openwebui.com) · [Quick Start (Docker)](https://docs.openwebui.com/getting-started/quick-start/) |
-| Docker | Nur, wenn du Open WebUI als Container startest. | [Docker Desktop](https://docs.docker.com/get-started/get-docker/) · [Docker Engine (Linux)](https://docs.docker.com/engine/install/) |
+| Open WebUI | Ab Lektion 01, Teil 2: Chat-Oberfläche für die Teile mit Chat (Lektion 01 ab Teil 2, Lektion 02 und 07). | [openwebui.com](https://openwebui.com) · [Quick Start (Docker)](https://docs.openwebui.com/getting-started/quick-start/) |
+| Qdrant | Vektordatenbank mit Volltextsuche, ab Lektion 06 (und Lektion 07, Teil 8 bis 11). Läuft als Docker-Container, siehe Qdrant einrichten. | [qdrant.tech](https://qdrant.tech) · [Quick Start](https://qdrant.tech/documentation/quickstart/) |
+| Docker | Nötig für Qdrant (Lektion 06, Lektion 07 Teil 8 bis 11) und optional, um Open WebUI als Container zu starten. | [Docker Desktop](https://docs.docker.com/get-started/get-docker/) · [Docker Engine (Linux)](https://docs.docker.com/engine/install/) |
 | VS Code | Empfohlen: F5 und Code Runner sind vorbereitet, es geht aber auch ohne. | [code.visualstudio.com](https://code.visualstudio.com) · [Code Runner](https://marketplace.visualstudio.com/items?itemName=formulahendry.code-runner) |
 
 Burp ist optional: Ist `BURP_PROXY_URL` leer, laufen die Programme direkt ohne Burp. Ist sie gesetzt, muss Burp laufen (Intercept aus). Für Lektion 02, Teil 2 braucht Node dann außerdem Burps CA-Zertifikat (`BURP_CA_CERT`, siehe Fehlersuche unten).
@@ -38,7 +39,7 @@ Burp ist optional: Ist `BURP_PROXY_URL` leer, laufen die Programme direkt ohne B
 Das brauchst du erst ab Lektion 01, Teil 3. Eine ausführliche Anleitung gibt es [bei PortSwigger](https://portswigger.net/burp/documentation/desktop/getting-started), hier die Schritte, die du brauchst:
 
 1. Starte Burp und wähle "Temporary project" und "Use Burp defaults".
-2. Der Proxy lauscht standardmäßig auf `127.0.0.1:8080` (Proxy, Proxy settings). Das ist der Wert in `BURP_PROXY_URL` (`http://localhost:8080`).
+2. Der Proxy lauscht standardmäßig auf `127.0.0.1:8080` (Proxy, Proxy settings). Das ist der Wert, den du in `BURP_PROXY_URL` einträgst (`http://localhost:8080`; standardmäßig ist sie leer).
 3. Unter Proxy, HTTP history siehst du jede Anfrage, die dein Programm schickt.
 4. Unter Proxy, Intercept schaltest du "Intercept is on/off". Ist es an, hält Burp jede Anfrage fest, bis du auf "Forward" klickst. Open WebUI schickt pro Nachricht mehrere Anfragen: Leite alle mit "Forward" weiter und schalte Intercept danach wieder aus.
 
@@ -50,9 +51,11 @@ Alle Modelle laufen in LM Studio auf einem Server. Die Tabelle nennt die Modellk
 
 | Modell | Wofür | Modellkarte | GGUF | Lizenz |
 | --- | --- | --- | --- | --- |
-| Qwen3.5-4B (Q4_K_M) | Chat-Modell, Lektion 01 bis 02, Lektion 04 Teil 4 und Lektion 05 | [lmstudio-community/Qwen3.5-4B-GGUF](https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF) | [lmstudio-community](https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF) | Apache-2.0 |
-| multilingual-e5-base (Q8_0) | Embedding-Modell, Lektion 03 bis 05 | [dinab/multilingual-e5-base-Q8_0-GGUF](https://huggingface.co/dinab/multilingual-e5-base-Q8_0-GGUF) | [dinab (Community)](https://huggingface.co/dinab/multilingual-e5-base-Q8_0-GGUF) | MIT |
+| Qwen3.5-4B (Q4_K_M) | Chat-Modell, Lektion 01 bis 02, Lektion 04 Teil 4, Lektion 06 Teil 5 bis 7 und Lektion 07 | [lmstudio-community/Qwen3.5-4B-GGUF](https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF) | [lmstudio-community](https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF) | Apache-2.0 |
+| multilingual-e5-base (Q8_0) | Embedding-Modell, Lektion 03 bis 07 | [dinab/multilingual-e5-base-Q8_0-GGUF](https://huggingface.co/dinab/multilingual-e5-base-Q8_0-GGUF) | [dinab (Community)](https://huggingface.co/dinab/multilingual-e5-base-Q8_0-GGUF) | MIT |
 | EmbeddingGemma 300m (QAT Q4_0) | Vergleichsmodell, nur Lektion 03, Teil 2 und 3 | [lmstudio-community/embeddinggemma-300m-qat-GGUF](https://huggingface.co/lmstudio-community/embeddinggemma-300m-qat-GGUF) | [lmstudio-community](https://huggingface.co/lmstudio-community/embeddinggemma-300m-qat-GGUF) | Gemma-Nutzungsbedingungen |
+
+`Q4_K_M`, `Q8_0` und `QAT Q4_0` benennen, wie stark ein Modell komprimiert (quantisiert) ist: Die Zahl ist grob die Bit-Zahl pro Gewicht, `Q4` ist also kleiner und etwas ungenauer als `Q8`; QAT heißt, das Modell wurde schon mit Blick auf die Kompression trainiert und verliert dadurch weniger Qualität.
 
 Die Original-Modellkarte von EmbeddingGemma ([google/embeddinggemma-300m](https://huggingface.co/google/embeddinggemma-300m)) ist gesperrt (gated): Du musst dich bei Hugging Face anmelden und die Bedingungen akzeptieren. Das GGUF in der Tabelle ist nicht gesperrt, du kannst es direkt laden. Das GGUF von E5 stammt von einem Community-Konto (dinab), nicht von den Autoren des Modells: Es ist eine Umwandlung von [intfloat/multilingual-e5-base](https://huggingface.co/intfloat/multilingual-e5-base). Das GGUF von Qwen stammt von lmstudio-community, es ist eine Umwandlung von [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B).
 
@@ -67,6 +70,8 @@ Alle drei Modellnamen in `.env.example` sind Platzhalter. Kopiere den Identifier
 
 Ein anderer OpenAI-kompatibler Server geht auch, solange er Chat und Embeddings unter derselben Adresse anbietet.
 
+**Kostenhinweis bei bezahlten APIs:** Die Programme setzen kein `maxTokens`, ein bezahlter Anbieter berechnet also jede Länge, die das Modell erzeugt, und das Reranking (Lektion 06, Teil 5; Lektion 07, Teil 9) schickt pro Frage mehrere Chat-Anfragen parallel. Auf einem lokalen Server kostet das nichts, bei einer bezahlten API schon: Setze vorher ein Ausgabenlimit.
+
 ### Hardware
 
 Die Zahlen sind Faustregeln. Rechne mit Arbeitsspeicher (RAM, bei Grafikkarte VRAM) etwa in Höhe der Dateigröße plus etwas Platz für den Kontext.
@@ -78,6 +83,26 @@ Die Zahlen sind Faustregeln. Rechne mit Arbeitsspeicher (RAM, bei Grafikkarte VR
 | EmbeddingGemma 300m (QAT Q4_0) | 0,23 GB | unter 1 GB |
 
 Das Chat-Modell ist klein genug für die meisten Laptops. Kleine Modelle antworten allerdings schwächer, besonders bei Werkzeugaufrufen (Lektion 02, Teil 3 und 4).
+
+### Qdrant einrichten
+
+Ab Lektion 06 brauchst du ein laufendes Qdrant (eine Vektordatenbank). Starte es einmal als Docker-Container:
+
+```bash
+docker run -d --name qdrant -p 127.0.0.1:6333:6333 qdrant/qdrant:v1.20.0
+```
+
+Das `127.0.0.1:` ist Absicht: Mit einem schlichten `-p 6333:6333` veröffentlicht Docker den Port auf allen Netzwerkschnittstellen und umgeht dabei die Firewall des Rechners. Dieses Qdrant hat keine Authentifizierung, andere im Workshop-WLAN könnten deine Collection lesen oder vergiften. Die Version ist festgelegt, weil sie zur Client-Version (1.20) passt; der BM25-Volltextindex aus Lektion 06 braucht ein aktuelles Qdrant. Später genügt `docker start qdrant`. Die Adresse steht als `QDRANT_URL` in `.env` (Standard `http://localhost:6333`).
+
+### Open WebUI starten
+
+Wenn du Open WebUI als Container betreibst, startet dieser Befehl es (unter Linux braucht der Container die Option `--add-host`, damit er deinen Rechner erreicht; unter macOS und Windows schadet sie nicht):
+
+```bash
+docker run -d --name open-webui -p 127.0.0.1:3000:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data ghcr.io/open-webui/open-webui:v0.13.3
+```
+
+Öffne `http://localhost:3000` und lege beim ersten Anmelden das Admin-Konto an (das erste Konto wird zum Administrator; die Daten bleiben im Volume `open-webui` auf deinem Rechner). Port 3000 ist Absicht: Burps Standard-Listener belegt schon 8080 (siehe "Wenn etwas nicht klappt"). Später genügt `docker start open-webui`. Ohne Docker: `open-webui serve --port 3000` ([Quick Start](https://docs.openwebui.com/getting-started/quick-start/)). Die Version ist festgelegt, damit die Oberfläche zu dieser Anleitung passt; neuere Versionen können Menüpunkte verschieben.
 
 ### Variante: Trainer-Server
 
@@ -94,17 +119,19 @@ node --version
 Dann installierst du die Pakete und legst deine `.env` an:
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 ```
 
-> **Hinweis zu `npm audit`:** Nach der Installation meldet npm einige Sicherheitshinweise (Advisories). Sie stammen ausschließlich aus Abhängigkeiten von `ollama-api-facade-js`, an deren Version der Workshop bewusst festhängt (1.0.7). Du musst nichts tun: `npm audit fix` ändert hier nichts. Führe auf keinen Fall `npm audit fix --force` aus. Das kann Pakete der festgelegten Fassade ersetzen, und die Chat-Teile laufen danach womöglich nicht mehr. Die betroffenen Funktionen (zum Beispiel LangSmith-Tracing, der Protokolldienst von LangChain) sind nach unserer Prüfung im Workshop nicht erreichbar. Setze keine `LANGSMITH_*`- und keine `LANGCHAIN_TRACING*`-Variablen (prüfe auch dein Shell-Profil), dann läuft kein Tracing. Das ist ein echtes Beispiel für einen Zielkonflikt in der Lieferkette (siehe [LLM03](content/owasp-genai-top-10/03-llm03-lieferkette.md)).
+`npm ci` installiert genau die Versionen aus `package-lock.json` und prüft deren Integrität. `npm install` brauchst du nur, wenn du Abhängigkeiten ändern willst.
+
+> **Bekannte Sicherheitshinweise zu Abhängigkeiten (`npm audit`):** `npm audit` meldet weiterhin 4 Funde (`langsmith` bis 0.5.26, `zod` unter 4.6.6 (hier 3.25) und `uuid` unter 11.1.1). Sie kommen nur über `ollama-api-facade-js` 1.0.7, die neueste Version und die, an der der Workshop festhält; sie hängt von `@langchain/core` 0.3 ab. Eine kompatible Korrektur gibt es nicht: Sie bräuchte Sprünge auf neue Hauptversionen, die die Fassade kaputt machen. Deshalb ändert `npm audit fix` hier nichts, und `npm audit fix --force` führst du nie aus. Wir nehmen die Funde hin, weil das Risiko gering ist: Die Fassade läuft nur auf localhost, LangSmith-Tracing ist aus (setze keine `LANGSMITH_*`- und keine `LANGCHAIN_TRACING*`-Variablen, prüfe auch dein Shell-Profil), und die betroffenen Funktionen sind im Workshop nicht erreichbar. Zusätzlich legt `package.json` über `overrides` feste Versionen von `langsmith`, `zod` und `undici` fest, soweit das kompatibel ist. Das ist ein echtes Beispiel für einen Zielkonflikt in der Lieferkette (siehe [LLM03](content/owasp-genai-top-10/03-llm03-lieferkette.md)).
 
 Unter Windows kopierst du die Vorlage so: `copy .env.example .env` (cmd) oder `Copy-Item .env.example .env` (PowerShell). Die Befehle in diesem README sind sonst für ein POSIX-Terminal geschrieben (Linux, macOS, Git Bash). `npm run …` funktioniert überall gleich.
 
 Öffne danach `.env` und passe die Werte an deine Umgebung an: die Identifier der geladenen Modelle aus LM Studio, bei Bedarf die Adresse des Servers, den Burp-Port und den API-Schlüssel. Jeder Eintrag ist in `.env.example` erklärt. Die Datei `.env` ist in `.gitignore` und wird nicht eingecheckt.
 
-**Ohne Burp:** `BURP_PROXY_URL=` leer lassen (der Wert aus `.env.example` ist `http://localhost:8080`, lösche ihn). Ein leerer Wert heißt: keine Proxy-Nutzung, alle Programme verbinden direkt. Dann brauchst du auch kein `BURP_CA_CERT`. Steht die Adresse noch drin und Burp läuft nicht, brechen die Programme, die Burp nutzen (ab Lektion 01, Teil 3, außer `l04:0`), mit einer Burp-Meldung ab.
+**Mit und ohne Burp:** `BURP_PROXY_URL` ist in `.env.example` leer: kein Proxy, alle Programme verbinden direkt, und du brauchst auch kein `BURP_CA_CERT`. Für Lektion 01, Teil 3 schaltest du den Proxy selbst ein und setzt `BURP_PROXY_URL=http://localhost:8080`. Ist die Adresse gesetzt und Burp läuft nicht, brechen die Programme, die Burp nutzen (ab Lektion 01, Teil 3, außer `l04:0`), mit einer Burp-Meldung ab.
 
 Die Einstellungen im Überblick:
 
@@ -115,12 +142,13 @@ Die Einstellungen im Überblick:
 | `REMOTE_MODEL_NAME` | Identifier des Chat-Modells aus LM Studio. |
 | `REMOTE_EMBEDDING_MODEL_NAME` | Identifier des E5-Modells. |
 | `REMOTE_EMBEDDING_GEMMA_MODEL_NAME` | Identifier von EmbeddingGemma, nur für Lektion 03, Teil 2 und 3. |
-| `BURP_PROXY_URL`, `BURP_CA_CERT` | Burp-Proxy und dessen Zertifikat (optional). |
+| `BURP_PROXY_URL`, `BURP_CA_CERT` | Burp-Proxy und dessen Zertifikat. Optional: `BURP_PROXY_URL` ist standardmäßig leer (kein Proxy), setze sie für Lektion 01, Teil 3 auf `http://localhost:8080`. |
+| `QDRANT_URL` | Adresse von Qdrant ab Lektion 06. Standard `http://localhost:6333`. |
 | `FACADE_HOST`, `FACADE_PORT` | Wo die Ollama-Fassade lauscht. |
 
 ## Ein Programm starten
 
-Der Workshop besteht aus fünf Lektionen, jede mit mehreren Teilen. Jeder Teil ist eine Datei, die mit einem Kommentar beginnt, der Lernziel, Voraussetzungen, Startbefehl und Aufgabe nennt. Es gibt drei Wege, sie zu starten:
+Der Workshop besteht aus sieben Lektionen, jede mit mehreren Teilen. Jeder Teil ist eine Datei, die mit einem Kommentar beginnt, der Lernziel, Voraussetzungen, Startbefehl und Aufgabe nennt. Es gibt drei Wege, sie zu starten:
 
 | Weg | So geht's |
 | --- | --- |
@@ -132,11 +160,11 @@ Du musst nicht aus einem bestimmten Ordner starten: Alle Pfade werden vom Repo-R
 
 ## Open WebUI mit der Fassade verbinden (ab Lektion 01, Teil 2)
 
-Das brauchst du erst ab Lektion 01, Teil 2, nach der Einrichtung. Die Teile mit Chat (Lektion 01 ab Teil 2, Lektion 02 und Lektion 05) starten einen kleinen Server, die Fassade. Sie verhält sich gegenüber Open WebUI wie ein Ollama-Server und reicht jede Chat-Nachricht an das Programm weiter. Standardmäßig lauscht sie auf `127.0.0.1:11435` (`FACADE_HOST`, `FACADE_PORT`). Nicht Ollamas Standardport 11434, damit ein echtes Ollama daneben laufen kann.
+Das brauchst du erst ab Lektion 01, Teil 2, nach der Einrichtung. Die Teile mit Chat (Lektion 01 ab Teil 2, Lektion 02 und Lektion 07) starten einen kleinen Server, die Fassade. Sie verhält sich gegenüber Open WebUI wie ein Ollama-Server und reicht jede Chat-Nachricht an das Programm weiter. Standardmäßig lauscht sie auf `127.0.0.1:11435` (`FACADE_HOST`, `FACADE_PORT`). Nicht Ollamas Standardport 11434, damit ein echtes Ollama daneben laufen kann.
 
 1. Starte den Teil. Im Log steht `Facade ready` mit der Adresse.
 2. Öffne in Open WebUI den Administrationsbereich (Admin Panel), dann Einstellungen, dann Verbindungen ("Administrationsbereich → Einstellungen → Verbindungen", englisch Admin Panel → Settings → Connections), und füge eine **Ollama**-Verbindung mit der Adresse der Fassade hinzu, z. B. `http://127.0.0.1:11435`.
-3. Der Teil erscheint als Modell (`lesson-01-part-2`, `lesson-01-part-3`, `lesson-02-part-1` bis `lesson-02-part-4`, `lesson-05-headings`, `lesson-05-semantic`, `lesson-05-questions`). Wähle es im Chat aus.
+3. Der Teil erscheint als Modell (`lesson-01-part-2`, `lesson-01-part-3`, `lesson-02-part-1` bis `lesson-02-part-4`, `lesson-07-headings`, `lesson-07-semantic`, `lesson-07-questions` und so weiter; die vollständige Liste der Modellnamen steht in [`lessons/07-rag/README.de.md`](lessons/07-rag/README.de.md)). Wähle es im Chat aus.
 
 Läuft Open WebUI in Docker, erreicht der Container `127.0.0.1` deines Rechners nicht. Setze dann in `.env` `FACADE_HOST=0.0.0.0` und trage in Open WebUI `http://host.docker.internal:11435` ein (Port wie `FACADE_PORT`; Podman: `host.containers.internal`). Unter Linux muss der Container dafür mit `--add-host=host.docker.internal:host-gateway` gestartet werden. Mit `0.0.0.0` ist die Fassade für alle im Netz erreichbar, und sie hat keine Authentifizierung: Nutze das nur in einem Netz, dem du vertraust. Unter Linux mit Docker geht es enger: Nimm statt `0.0.0.0` die IP der Docker-Bridge (meist `172.17.0.1`, zu sehen mit `ip addr show docker0`) als `FACADE_HOST`.
 
@@ -149,14 +177,16 @@ Jede Lektion hat einen Ordner mit eigener `README.de.md`: Dort stehen Lernziel, 
 | [01 – Vorbereitung](lessons/01-preparation/README.de.md) | Teil 1 `l01:1` (Hello LLM), Teil 2 `l01:2` (Open WebUI), Teil 3 `l01:3` (Burp) | Du schickst einen Prompt an ein Sprachmodell, setzt eine Chat-Oberfläche davor und siehst in Burp jede Anfrage. | LM Studio (Chat-Modell); ab Teil 2 Open WebUI; Teil 3 Burp |
 | [02 – Tool-Calls](lessons/02-tool-calls/README.de.md) | Teil 1 `l02:1` (Wissen und Few-Shot), Teil 2 `l02:2` (Web-Scraping), Teil 3 `l02:3` (Tool-Calls von Hand), Teil 4 `l02:4` (Tool-Calls mit `createAgent`) | Du gibst dem Modell erst von Hand Wissen mit (Teil 1 und 2) und lässt es dann per Werkzeugaufruf selbst holen (Teil 3 und 4). | LM Studio (Chat-Modell), Open WebUI, Burp optional; Teil 2 Internet |
 | [03 – Embeddings](lessons/03-embeddings/README.de.md) | Teil 1 `l03:1`, Teil 2 `l03:2`, Teil 3 `l03:3` | Du erzeugst Embeddings, vergleichst Texte mit der Kosinus-Ähnlichkeit und siehst, wozu die Präfixe `query: ` und `passage: ` dienen. | LM Studio (E5-Modell, ab Teil 2 auch EmbeddingGemma), Burp optional |
-| [04 – Chunking](lessons/04-chunking/README.de.md) | Teil 0 `l04:0` (Chunks erzeugen), Teil 1 bis 4 `l04:1` bis `l04:4` (vier Arten zu schneiden und Indizes bauen) | Du zerlegst Dokumente in Chunks, die ins Token-Limit von E5 passen, baust daraus Indizes und siehst, wie die Art des Schneidens die Suche verändert. | LM Studio (E5-Modell, Teil 4 auch Chat-Modell), Burp optional; ab Teil 1 die Chunks aus Teil 0 |
-| [05 – RAG](lessons/05-rag/README.de.md) | Teil 1 `l05:1` (Überschriften), Teil 2 `l05:2` (semantisch), Teil 3 `l05:3` (generierte Fragen) | Du beantwortest Fragen mit Quellenangaben, indem du passende Chunks suchst und sie dem Modell als Kontext gibst (RAG). | LM Studio (Chat- und E5-Modell), Open WebUI, Burp optional, Index aus Lektion 04, Teil 2, 3 bzw. 4 |
+| [04 – Chunking](lessons/04-chunking/README.de.md) | Teil 0 `l04:0` (Chunks erzeugen), Teil 1 bis 4 `l04:1` bis `l04:4` (vier Arten zu schneiden und Indizes bauen), Teil 5 `l04:5` (Parent-Document) | Du zerlegst Dokumente in Chunks, die ins Token-Limit von E5 passen, baust daraus Indizes und siehst, wie die Art des Schneidens die Suche verändert. | LM Studio (E5-Modell, Teil 4 auch Chat-Modell), Burp optional; ab Teil 1 die Chunks aus Teil 0; Teil 5 den Index aus Teil 2 |
+| [05 – Retrieval-Strategien](lessons/05-retrieval-strategies/README.de.md) | Teil 1 `l05:1` (Top-k), Teil 2 `l05:2` (MMR), Teil 3 `l05:3` (Metadaten-Filter), Teil 4 `l05:4` (Schwellenwert), Teil 5 `l05:5` (alles im Vergleich, mit Fragen-Set in `question-set.json`) | Du vergleichst vier Regeln, nach denen die Suche Chunks auswählt, siehst, warum Zugriffsrechte vor der Suche gefiltert werden, und prüfst den Schwellenwert an einem Satz Testfragen (Teil 5). | LM Studio (E5-Modell), Burp optional, Index aus Lektion 04, Teil 2; kein Chat-Modell, kein Open WebUI |
+| [06 – Hybrid-Suche und Reranking](lessons/06-hybrid-rerank/README.de.md) | Teil 1 `l06:1` (Collection laden), Teil 2 `l06:2` (Keywords, BM25), Teil 3 `l06:3` (Vektorsuche), Teil 4 `l06:4` (Hybrid mit RRF), Teil 5 `l06:5` (Reranking), Teil 6 `l06:6` (Multi-Query), Teil 7 `l06:7` (alles im Vergleich) | Du lädst den Index in Qdrant, suchst mit Keywords und Vektoren, verbindest beide mit RRF und siehst, was Reranking und Multi-Query bringen. | LM Studio (E5-Modell, ab Teil 5 auch Chat-Modell), Qdrant, Burp optional, Index aus Lektion 04, Teil 2; kein Open WebUI |
+| [07 – RAG](lessons/07-rag/README.de.md) | Teil 1 bis 3 `l07:1` bis `l07:3` (Überschriften, semantisch, generierte Fragen), Teil 4 bis 10 `l07:4` bis `l07:10` (Parent-Document, MMR, Metadaten-Filter, Schwellenwert, Hybrid, Rerank, Multi-Query), Teil 11 `l07:11` (alles in einer Fassade) | Du beantwortest Fragen mit Quellenangaben, indem du passende Chunks suchst und sie dem Modell als Kontext gibst (RAG). | LM Studio (Chat- und E5-Modell), Open WebUI, Burp optional, Index aus Lektion 04, Teil 2, 3 bzw. 4; Teil 8 bis 11 zusätzlich Qdrant mit der Collection aus `l06:1` |
 
 Lektion 02 heißt "Tool-Calls", weil sie darauf hinausläuft: Teil 1 und 2 bringen Wissen von Hand in den Prompt (feste Fakten, frische Webseite), danach holt sich das Modell in Teil 3 und 4 selbst, was es braucht.
 
 Burp ist ab Lektion 01, Teil 3 eingeplant, aber optional: Ist `BURP_PROXY_URL` gesetzt, muss Burp laufen (Intercept aus). Lektion 02, Teil 2 braucht zusätzlich Internet, weil es eine Webseite abruft, und bei gesetztem `BURP_PROXY_URL` auch `BURP_CA_CERT`, weil diese Seite per HTTPS läuft.
 
-Lektion 04, Teil 0 erzeugt die Chunks (rund 350 bis 760 Anfragen an den Embedding-Endpunkt, je nach Zählmethode; die Dauer hängt von deiner Hardware ab, siehe Kopf der Datei). Erzeuge sie zuerst mit `npm run l04:0`. Die Teile 1 bis 4 setzen sie voraus und schreiben die Indizes nach `indexes/` (steht in `.gitignore`, wird beim ersten Lauf angelegt). Lektion 05 hat drei Varianten, jede liest einen anderen Index: `l05:1` den aus `l04:2` (Überschriften), `l05:2` den aus `l04:3` (semantisch), `l05:3` den aus `l04:4` (generierte Fragen). Starte deshalb zuerst den passenden Teil von Lektion 04. Beachte bei `l05:3`: Der Fragen-Index aus `l04:4` deckt standardmäßig (`FULL_CORPUS = false` in `lessons/04-chunking/04-question-generation-chunking.ts`) nur `01-llm01-prompt-injection.md` ab, `l05:3` beantwortet also nur Fragen dazu. Für den ganzen Korpus setze `FULL_CORPUS = true` und lasse `l04:4` neu laufen (viele Minuten). Die drei Varianten teilen sich den Port der Fassade, es läuft immer nur eine.
+Lektion 04, Teil 0 erzeugt die Chunks (rund 350 bis 760 Anfragen an den Embedding-Endpunkt, je nach Zählmethode; die Dauer hängt von deiner Hardware ab, siehe Kopf der Datei). Erzeuge sie zuerst mit `npm run l04:0`. Die Teile 1 bis 4 setzen sie voraus (Teil 5 liest nur den Index aus Teil 2), die Teile 1 bis 4 schreiben die Indizes nach `indexes/` (steht in `.gitignore`, wird beim ersten Lauf angelegt). Lektion 05 liest in allen fünf Teilen den Index aus `l04:2` (Überschriften). Lektion 07 hat drei Grundvarianten, jede liest einen anderen Index: `l07:1` den aus `l04:2` (Überschriften), `l07:2` den aus `l04:3` (semantisch), `l07:3` den aus `l04:4` (generierte Fragen); Teil 4 bis 7 nutzen den Index aus `l04:2`, Teil 8 bis 11 die Qdrant-Collection aus `l06:1`. Starte deshalb zuerst den passenden Teil von Lektion 04. Beachte bei `l07:3`: Der Fragen-Index aus `l04:4` deckt standardmäßig (`FULL_CORPUS = false` in `lessons/04-chunking/04-question-generation-chunking.ts`) nur `01-llm01-prompt-injection.md` ab, `l07:3` beantwortet also nur Fragen dazu. Für den ganzen Korpus setze `FULL_CORPUS = true` und lasse `l04:4` neu laufen (viele Minuten). Alle Teile von Lektion 07 teilen sich den Port der Fassade, es läuft immer nur einer.
 
 ## Wenn etwas nicht klappt
 
@@ -164,7 +194,7 @@ Ein Programm gibt Fehler als eine Zeile auf Englisch aus.
 
 **So liest du eine Fehlerzeile:** Der Text vor `– Cause:` sagt, was fehlgeschlagen ist, der Text danach, warum. Bei Netzwerkfehlern ist die Ursache eine Kette. Beispiel:
 
-```
+```text
 ERROR Model: Call failed – Cause: Connection error. – fetch failed – connect ECONNREFUSED 127.0.0.1:1234 { model: '...', durationMs: 11 }
 ```
 
@@ -187,10 +217,12 @@ Hier ist der Modell-Aufruf gescheitert, weil keine Verbindung zustande kam: Auf 
 | `BURP_CA_CERT is missing for HTTPS through Burp. Export Burp’s CA certificate as DER and convert it with openssl x509 -inform der -in burp.der -out burp.pem. Set BURP_CA_CERT=burp.pem or clear BURP_PROXY_URL in .env.` (Lektion 02, Teil 2) | Lektion 02, Teil 2 ruft eine HTTPS-Seite über Burp ab, dafür braucht Node Burps CA-Zertifikat. Export: in Burp Proxy, Proxy settings, Import / export CA certificate, Certificate in DER format, als `burp.der` speichern. Dann im Repo-Root `openssl x509 -inform der -in burp.der -out burp.pem` und in `.env` `BURP_CA_CERT=burp.pem` setzen (Pfad relativ zum Repo-Root). Unter Windows bringt Git for Windows `openssl` mit: Starte die Git Bash (oder rufe `openssl.exe` aus dem Ordner `usr\bin` der Git-Installation auf). Installiere das Zertifikat nicht im Betriebssystem oder Browser: Die Datei genügt, nur dieses Programm vertraut ihr. Hast du es doch installiert, entferne es nach dem Workshop wieder. Oder `BURP_PROXY_URL` leeren. |
 | `Cannot read BURP_CA_CERT: ... Check the path and read permissions.` | Pfad falsch oder keine Leserechte. Der Pfad gilt relativ zum Repo-Root. |
 | `Prepared chunks are missing. Generate them with npm run l04:0.` (Lektion 04, Teil 1 bis 4) | Die Chunks sind nicht im Repo, sondern werden erzeugt. Starte einmal `npm run l04:0` (E5 muss in LM Studio geladen sein). |
-| `Cannot load index ... (headings). Generate it with npm run l04:0, then npm run l04:2.` (Lektion 05) | Der Index fehlt. Starte erst `l04:0` und dann das genannte Skript (`l04:2`, `l04:3` oder `l04:4`, je nach Datei aus Lektion 05). |
+| `Cannot load index ... (headings). Generate it with npm run l04:0, then npm run l04:2.` (Lektion 04 Teil 5, Lektion 05 und 07) | Der Index fehlt. Starte erst `l04:0` und dann das genannte Skript (bei Lektion 04 Teil 5 und Lektion 05 immer `l04:2`; bei Lektion 07 `l04:2`, `l04:3` oder `l04:4`, je nach Datei). |
 | `The index <file> is invalid or outdated. Regenerate the chunks with npm run l04:0, then regenerate the index with npm run l04:N.` oder `The chunk manifest is invalid or outdated. Regenerate the chunks with npm run l04:0.` | Die Datei stammt aus einer älteren Version des Programms. Erzeuge zuerst die Chunks und dann den Index neu, mit dem Skript aus der Meldung. |
-| `Cannot load the question index <file>. Check the file and QUESTIONS_PER_CHUNK, or regenerate it with npm run l04:0 followed by npm run l04:4.` (nur Lektion 04, Teil 4) | Die Datei des Fragen-Index passt nicht zu `QUESTIONS_PER_CHUNK` oder ist beschädigt. Erzeuge sie mit `l04:4` neu (vorher löschen). In Lektion 05, Teil 3 fehlt der Index dagegen mit `Cannot load index ... (questions). Generate it with npm run l04:0, then npm run l04:4.` (siehe die Zeile oben). |
+| `Cannot load the question index <file>. Check the file and QUESTIONS_PER_CHUNK, or regenerate it with npm run l04:0 followed by npm run l04:4.` (nur Lektion 04, Teil 4) | Die Datei des Fragen-Index passt nicht zu `QUESTIONS_PER_CHUNK` oder ist beschädigt. Erzeuge sie mit `l04:4` neu (vorher löschen). In Lektion 07, Teil 3 fehlt der Index dagegen mit `Cannot load index ... (questions). Generate it with npm run l04:0, then npm run l04:4.` (siehe die Zeile oben). |
 | `The embedding request failed. Check REMOTE_MODEL_BASE_URL, start the LM Studio server and load the model configured in REMOTE_EMBEDDING_MODEL_NAME.` (Lektion 04, Teil 0) | Der LM-Studio-Server läuft nicht, die Adresse stimmt nicht, oder das E5-Modell ist nicht geladen. Bei 401, 403, 404 und 429 steht der Status in der Ursache hinter `– Cause:`. Eine Ablehnung wegen zu langer Eingabe zählt nicht als Fehler, die braucht das Programm zum Zählen. Lehnt der Server nur die lange Kalibrierungsprobe mit einem anderen Status ab, warnt das Programm (`No reliable token count: The long calibration probe was rejected (HTTP <status>)…`) und macht mit der Zeichenschätzung weiter. |
+| `Qdrant is not reachable at http://localhost:6333/. Start it (docker run -d --name qdrant -p 127.0.0.1:6333:6333 qdrant/qdrant:v1.20.0) or fix QDRANT_URL in .env.` (Lektion 06, Lektion 07 Teil 8 bis 11) | Qdrant läuft nicht oder `QDRANT_URL` stimmt nicht. Starte es wie unter Qdrant einrichten beschrieben (`docker run -d --name qdrant -p 127.0.0.1:6333:6333 qdrant/qdrant:v1.20.0` oder `docker start qdrant`). Die Adresse in der Meldung ist deine `QDRANT_URL`. |
+| `The Qdrant collection <name> does not exist. Load it with npm run l06:1.` (Lektion 06 Teil 2 bis 7, Lektion 07 Teil 8 bis 11) | Qdrant läuft, aber die Collection ist noch nicht geladen (oder du hast einen frischen Container gestartet). Starte `npm run l06:1`; es braucht den Index aus `l04:2` (und `l04:3`, `l04:4`, wenn du diese Varianten willst). |
 | Open WebUI zeigt das Modell nicht | Läuft das Programm (Log `Facade ready`)? Stimmt die Adresse in der Ollama-Verbindung? Bei Docker siehe `host.docker.internal` oben. Steht im Log `Rejected request with unexpected Host header`, siehe die Zeile darunter. |
 | `Rejected request with unexpected Host header. Use localhost, an IP address, host.docker.internal or the FACADE_HOST name in the Open WebUI connection.` (HTTP 403) | In der Ollama-Verbindung von Open WebUI steht ein Rechnername (z. B. `mein-laptop.local`). Die Fassade lehnt fremde Hostnamen zum Schutz vor DNS-Rebinding ab. Trage `localhost`, eine IP-Adresse oder `host.docker.internal` (Podman: `host.containers.internal`) ein, oder setze den Namen als `FACADE_HOST`. |
 | Antwort bricht in Open WebUI ab | Das Modell war zu langsam, oder du hast Stopp gedrückt. Ein Abbruch steht als `Request cancelled.` im Log. Bei zu langsamem Modell: noch einmal versuchen oder ein kleineres Modell nehmen (siehe Hardware). |
@@ -199,10 +231,12 @@ Hier ist der Modell-Aufruf gescheitert, weil keine Verbindung zustande kam: Auf 
 
 | Pfad | Inhalt |
 | --- | --- |
-| `lessons/01-…` bis `lessons/05-…` | Die Lektionen, je ein Ordner mit `README.de.md` und einer Datei pro Teil (mit Lernziel und Aufgabe). |
-| `lessons/shared/` | Gemeinsame Module (Einstellungen, Logging, Proxy, Fassade, Embeddings, Index). Beschreibung in `lessons/shared/README.de.md`. |
+| `lessons/01-…` bis `lessons/07-…` | Die Lektionen, je ein Ordner mit `README.de.md` und einer Datei pro Teil (mit Lernziel und Aufgabe). |
+| `lessons/shared/` | Gemeinsame Module (Einstellungen, Logging, Proxy, Fassade, Embeddings, Index, `text.ts` zum Aufräumen von JSON). Beschreibung in `lessons/shared/README.de.md`. |
 | `content/owasp-genai-top-10/` | Die OWASP-Dokumente als Markdown; `npm run l04:0` erzeugt `chunks/`. |
 | `lessons/04-chunking/00-prepare-chunks.ts` | Erzeugt die Chunks mit `npm run l04:0`. |
+| `lessons/05-retrieval-strategies/question-set.json` | Testfragen mit erwarteten Quelldokumenten, die `npm run l05:5` zur Prüfung des Schwellenwerts nutzt. |
+| `lessons/06-hybrid-rerank/` | Hybrid-Suche und Reranking auf Qdrant (braucht den Container aus Qdrant einrichten). |
 | `indexes/` | Entsteht in Lektion 04 (Chunks mit Vektoren als JSON), nicht im Repo. |
 | `.env.example` | Vorlage für deine `.env`. |
 | `.vscode/` | Startkonfiguration (F5) und Code-Runner-Einstellungen. |
