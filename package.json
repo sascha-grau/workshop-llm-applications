@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@langchain/openai": "^1.8.2",
+    "@qdrant/js-client-rest": "^1.20.0",
     "cheerio": "^1.2.0",
     "express": "^5.3.0",
     "langchain": "^1.6.3",
@@ -28,9 +29,30 @@
     "l04:2": "node --env-file-if-exists=.env lessons/04-chunking/02-heading-chunking.ts",
     "l04:3": "node --env-file-if-exists=.env lessons/04-chunking/03-semantic-chunking.ts",
     "l04:4": "node --env-file-if-exists=.env lessons/04-chunking/04-question-generation-chunking.ts",
-    "l05:1": "node --env-file-if-exists=.env lessons/05-rag/01-heading-rag.ts",
-    "l05:2": "node --env-file-if-exists=.env lessons/05-rag/02-semantic-rag.ts",
-    "l05:3": "node --env-file-if-exists=.env lessons/05-rag/03-question-generation-rag.ts"
+    "l04:5": "node --env-file-if-exists=.env lessons/04-chunking/05-parent-document.ts",
+    "l05:1": "node --env-file-if-exists=.env lessons/05-retrieval-strategies/01-top-k.ts",
+    "l05:2": "node --env-file-if-exists=.env lessons/05-retrieval-strategies/02-mmr.ts",
+    "l05:3": "node --env-file-if-exists=.env lessons/05-retrieval-strategies/03-metadata-filter.ts",
+    "l05:4": "node --env-file-if-exists=.env lessons/05-retrieval-strategies/04-score-threshold.ts",
+    "l05:5": "node --env-file-if-exists=.env lessons/05-retrieval-strategies/05-full-demo.ts",
+    "l06:1": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/01-collection-load.ts",
+    "l06:2": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/02-keywords-search.ts",
+    "l06:3": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/03-vector-search.ts",
+    "l06:4": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/04-hybrid-rrf.ts",
+    "l06:5": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/05-reranking.ts",
+    "l06:6": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/06-multiquery.ts",
+    "l06:7": "node --env-file-if-exists=.env lessons/06-hybrid-rerank/07-full-demo.ts",
+    "l07:1": "node --env-file-if-exists=.env lessons/07-rag/01-heading-rag.ts",
+    "l07:2": "node --env-file-if-exists=.env lessons/07-rag/02-semantic-rag.ts",
+    "l07:3": "node --env-file-if-exists=.env lessons/07-rag/03-question-generation-rag.ts",
+    "l07:4": "node --env-file-if-exists=.env lessons/07-rag/04-parent-document-rag.ts",
+    "l07:5": "node --env-file-if-exists=.env lessons/07-rag/05-mmr-rag.ts",
+    "l07:6": "node --env-file-if-exists=.env lessons/07-rag/06-metadata-filter-rag.ts",
+    "l07:7": "node --env-file-if-exists=.env lessons/07-rag/07-score-threshold-rag.ts",
+    "l07:8": "node --env-file-if-exists=.env lessons/07-rag/08-hybrid-rag.ts",
+    "l07:9": "node --env-file-if-exists=.env lessons/07-rag/09-rerank-rag.ts",
+    "l07:10": "node --env-file-if-exists=.env lessons/07-rag/10-multiquery-rag.ts",
+    "l07:11": "node --env-file-if-exists=.env lessons/07-rag/11-full-demo.ts"
   },
   "keywords": [],
   "author": "",
@@ -38,11 +60,18 @@
   "type": "module",
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "typescript": "^7.0.2",
-    "@types/node": "^26.6.6"
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=22.19.0"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "langsmith@>=0.11.0 <1.0.0": "0.12.0",
+    "zod@>=4.0.0 <5.0.0": "$zod",
+    "@qdrant/js-client-rest": {
+      "undici": "7.30.2"
+    }
+  }
 }

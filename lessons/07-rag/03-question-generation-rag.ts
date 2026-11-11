@@ -1,25 +1,28 @@
-// Lektion 05 – RAG, Teil 3: RAG mit generierten Fragen
+// Lektion 07 – RAG, Teil 3: RAG mit generierten Fragen
 //
 // Lernziel: Du verstehst, wie RAG mit einem Multi-Vektor-Index arbeitet: Die Suche vergleicht die
 // Frage mit generierten Fragen, geantwortet wird aber mit dem Original-Chunk-Text.
 //
 // Gegenüber Teil 1 (`01-heading-rag.ts`, die Referenz mit dem vollständigen Ablauf) ändern sich
 // der Index und die Auswahl der Treffer. Geladen wird der Fragen-Index aus Lektion 04, Teil 4:
-// Er hat mehrere Einträge (Fragen-Vektoren) pro Chunk. Deshalb reicht das einfache Top-k nicht,
-// denn mehrere Fragen desselben Chunks könnten alle Plätze belegen. `createRagAnswer` bekommt
-// darum `retrieveQuestionChunks` (aus `rag.ts`) als dritten Parameter: Die Funktion bewertet alle
-// Fragen, nimmt jeden Chunk nur einmal (mit seiner besten Frage, Dedupe) und übergibt dessen Original-Text als
-// Kontext, nicht die Frage. Der Rest des Standardablaufs bleibt gleich.
+// Er hat mehrere Einträge (Fragen-Vektoren) pro Chunk. Deshalb reicht das einfache Top-k (Lektion
+// 05, Teil 1) nicht, denn mehrere Fragen desselben Chunks könnten alle Plätze belegen.
+// `createRagAnswer` bekommt darum `retrieveQuestionChunks` (aus `rag.ts`) als dritten Parameter:
+// Die Funktion bewertet alle Fragen, nimmt jeden Chunk nur einmal (mit seiner besten Frage,
+// Dedupe) und übergibt dessen Original-Text als Kontext, nicht die Frage. Das ist eine eigene
+// Retrieval-Strategie mit demselben Ziel wie MMR (Lektion 05, Teil 2): keine Plätze für
+// Wiederholungen. Dedupe streicht aber nur exakte Doppelte desselben Chunks, MMR auch ähnliche
+// Chunks. Der Rest des Standardablaufs bleibt gleich.
 //
-// Es kann immer nur ein Teil von Lektion 05 laufen (gleicher Port, FACADE_PORT): Beende vorher
-// den anderen mit Strg+C. In Open WebUI erscheint dieser Teil als Modell `lesson-05-questions`;
+// Es kann immer nur ein Teil von Lektion 07 laufen (gleicher Port, FACADE_PORT): Beende vorher
+// den anderen mit Strg+C. In Open WebUI erscheint dieser Teil als Modell `lesson-07-questions`;
 // lade bei Bedarf die Modellliste neu.
 //
 // Voraussetzungen: wie Teil 1, aber mit dem Index aus Lektion 04, Teil 4 (erst `npm run l04:0`,
 // dann `npm run l04:4`). Dieser Index wird mit dem Chat-Modell erzeugt und ist standardmäßig nur
 // für das Beispieldokument gefüllt (FULL_CORPUS in Lektion 04, Teil 4); Fragen zu anderen Dokumenten finden
 // dann nichts. Burp ist optional.
-// Start: npm run l05:3
+// Start: npm run l07:3
 //
 // Aufgabe:
 //   1. Stelle dieselbe Frage wie in Teil 1 und 2. Welche Quellen kommen, und wie wirkt sich der
@@ -33,8 +36,8 @@ import { createRagAnswer, loadRagIndex, startRag, retrieveQuestionChunks } from 
 import { runMain } from '../shared/startup.ts';
 
 // Name, unter dem die Fassade das Modell in Open WebUI anbietet.
-const ADVERTISED_MODEL = 'lesson-05-questions';
-// So viele verschiedene Chunks kommen als Kontext in den Prompt.
+const ADVERTISED_MODEL = 'lesson-07-questions';
+// So viele verschiedene Chunks kommen als Kontext in den Prompt (Top-k, Lektion 05, Teil 1).
 const TOP_K = 3;
 
 async function main() {

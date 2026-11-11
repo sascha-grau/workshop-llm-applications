@@ -1,4 +1,4 @@
-// Lektion 05 – RAG, Teil 2: RAG mit semantischen Chunks
+// Lektion 07 – RAG, Teil 2: RAG mit semantischen Chunks
 //
 // Lernziel: Du siehst, wie die Art des Chunkings die Antworten eines RAG-Systems verändert, bei
 // sonst identischem Ablauf.
@@ -11,13 +11,13 @@
 // Lektion 04, Teil 3 keine semantischen Schnitte (siehe dort); dann ähneln die Chunks denen aus
 // Lektion 04, Teil 2.
 //
-// Es kann immer nur ein Teil von Lektion 05 laufen (gleicher Port, FACADE_PORT): Beende vorher
-// den anderen mit Strg+C. In Open WebUI erscheint dieser Teil als Modell `lesson-05-semantic`;
+// Es kann immer nur ein Teil von Lektion 07 laufen (gleicher Port, FACADE_PORT): Beende vorher
+// den anderen mit Strg+C. In Open WebUI erscheint dieser Teil als Modell `lesson-07-semantic`;
 // lade bei Bedarf die Modellliste neu.
 //
 // Voraussetzungen: wie Teil 1, aber mit dem Index aus Lektion 04, Teil 3 (erst `npm run l04:0`,
 // dann `npm run l04:3`). Burp ist optional.
-// Start: npm run l05:2
+// Start: npm run l07:2
 //
 // Aufgabe:
 //   1. Stelle dieselbe Frage (z. B. "Wie begrenze ich Prompt Injection?") in Teil 1 und Teil 2.
@@ -32,8 +32,8 @@ import { createRagAnswer, loadRagIndex, startRag } from './rag.ts';
 import { runMain } from '../shared/startup.ts';
 
 // Name, unter dem die Fassade das Modell in Open WebUI anbietet.
-const ADVERTISED_MODEL = 'lesson-05-semantic';
-// So viele Chunks kommen als Kontext in den Prompt.
+const ADVERTISED_MODEL = 'lesson-07-semantic';
+// So viele Chunks kommen als Kontext in den Prompt (Top-k, Lektion 05, Teil 1).
 const TOP_K = 3;
 
 async function main() {
