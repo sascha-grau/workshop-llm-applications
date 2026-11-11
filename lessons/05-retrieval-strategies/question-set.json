@@ -1,0 +1,139 @@
+{
+  "questions": [
+    {
+      "id": "F-00",
+      "question": "Was ist neu in den OWASP Top 10 für LLM-Anwendungen 2025?",
+      "expectedSources": [
+        "00-vorwort-der-projektleiter.md"
+      ],
+      "keyPoint": "Unbegrenzter Verbrauch erweitert; Vektor-/Embedding-Schwachstellen und System-Prompt-Leakage neu; Übermäßige Handlungsfreiheit erweitert",
+      "tags": []
+    },
+    {
+      "id": "F-01",
+      "question": "Welche Maßnahmen schützen vor Prompt Injection?",
+      "expectedSources": [
+        "01-llm01-prompt-injection.md"
+      ],
+      "keyPoint": "Modellverhalten begrenzen, Ausgabeformate validieren, Ein-/Ausgabefilter, geringste Rechte, manuelle Freigabe, externe Inhalte kennzeichnen, adversarial Tests",
+      "tags": [
+        "testfrage",
+        "fehlerbild: falscher Chunk-Schnitt"
+      ]
+    },
+    {
+      "id": "F-02",
+      "question": "Kann mein Chatbot aus Versehen Kundendaten oder Firmengeheimnisse ausplaudern, und was tue ich dagegen?",
+      "expectedSources": [
+        "02-llm02-offenlegung-sensibler-informationen.md"
+      ],
+      "keyPoint": "Ja, über Trainingsdaten und Kontext; Datenbereinigung, Eingabevalidierung, Zugriffskontrollen, Nutzeraufklärung",
+      "tags": [
+        "umgangssprachlich"
+      ]
+    },
+    {
+      "id": "F-03",
+      "question": "Welche Risiken nennt OWASP für die Lieferkette von LLM-Anwendungen?",
+      "expectedSources": [
+        "03-llm03-lieferkette.md"
+      ],
+      "keyPoint": "Neun Risiken von Drittanbieterpaketen über Lizenzen, veraltete Modelle, Modellherkunft, LoRA-Adapter bis unklare AGB",
+      "tags": [
+        "fehlerbild: zu kleines k"
+      ]
+    },
+    {
+      "id": "F-04",
+      "question": "In welchen Phasen kann Data Poisoning auftreten?",
+      "expectedSources": [
+        "04-llm04-poisoning-von-daten-und-modellen.md"
+      ],
+      "keyPoint": "Vortraining, Fine-Tuning und Embedding-Daten",
+      "tags": []
+    },
+    {
+      "id": "F-05",
+      "question": "Warum ist es gefährlich, die Antwort des Modells ungeprüft an eine Shell oder Datenbank weiterzureichen?",
+      "expectedSources": [
+        "05-llm05-fehlerhafte-ausgabeverarbeitung.md"
+      ],
+      "keyPoint": "XSS, CSRF, SSRF, Privilegienerweiterung, Remotecodeausführung; Ausgaben wie nicht vertrauenswürdige Eingaben behandeln (Zero Trust)",
+      "tags": [
+        "fehlerbild: ehrliches Nein trotz Quelle"
+      ]
+    },
+    {
+      "id": "F-06",
+      "question": "Was sind die drei Ursachen übermäßiger Handlungsfreiheit?",
+      "expectedSources": [
+        "06-llm06-uebermaessige-handlungsfreiheit.md"
+      ],
+      "keyPoint": "Übermäßige Funktionalität, Berechtigungen, Autonomie",
+      "tags": []
+    },
+    {
+      "id": "F-07",
+      "question": "Was unterscheidet Prompt Injection von System Prompt Leakage?",
+      "expectedSources": [
+        "07-llm07-offenlegung-des-system-prompts.md",
+        "01-llm01-prompt-injection.md"
+      ],
+      "keyPoint": "Injection manipuliert das Verhalten über Eingaben; Leakage legt Systemanweisungen offen, das Risiko liegt in sensiblen Daten im Prompt",
+      "tags": [
+        "zwei-dokumente"
+      ]
+    },
+    {
+      "id": "F-08",
+      "question": "Wie können Angreifer die Wissensbasis eines RAG-Systems vergiften?",
+      "expectedSources": [
+        "08-llm08-schwachstellen-in-vektoren-und-embeddings.md"
+      ],
+      "keyPoint": "Manipulierte Dokumente (z. B. versteckter Text) verzerren Antworten; Datenvalidierung und Quellenauthentifizierung",
+      "tags": [
+        "fehlerbild: Embedding-Fehlzuordnung (konkurriert mit LLM04)"
+      ]
+    },
+    {
+      "id": "F-09",
+      "question": "Welche Arten von Fehlinformationen nennt OWASP?",
+      "expectedSources": [
+        "09-llm09-fehlinformationen.md"
+      ],
+      "keyPoint": "Sachliche Ungenauigkeiten, unbelegte Behauptungen, Falschdarstellung von Fachwissen, unsichere Code-Generierung",
+      "tags": []
+    },
+    {
+      "id": "F-10",
+      "question": "Welche konkreten Grenzwerte für Rate Limiting empfiehlt OWASP gegen unbegrenzten Verbrauch?",
+      "expectedSources": [
+        "10-llm10-unbegrenzter-verbrauch.md"
+      ],
+      "keyPoint": "OWASP nennt keine Zahlen; empfiehlt Rate Limiting, Quotas, Timeouts, Ressourcenzuweisung",
+      "tags": [
+        "fehlerbild: Halluzination trotz richtiger Quelle"
+      ]
+    },
+    {
+      "id": "F-11",
+      "question": "Welche Unternehmen sind Gold-Sponsoren des Projekts?",
+      "expectedSources": [
+        "11-appendix-llm-application-architecture-and-threat-modeling.md"
+      ],
+      "keyPoint": "ByteDance, HiddenLayer, Mend.io, Palo Alto Networks, Snyk",
+      "tags": [
+        "zugriffsgruppe: intern"
+      ]
+    }
+  ],
+  "withoutSource": {
+    "id": "no-source",
+    "question": "Wie richte ich eine Firewall unter Linux ein?",
+    "expectedSources": [],
+    "keyPoint": "Korpus enthält nichts dazu",
+    "tags": [
+      "ohne-quelle"
+    ]
+  }
+}
