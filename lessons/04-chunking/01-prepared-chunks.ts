@@ -36,7 +36,7 @@
 //      noch im richtigen Dokument?
 //   2. Ändere `EXAMPLE_DOCUMENT` in chunking.ts auf ein anderes Dokument aus dem Manifest. Wie
 //      viele Chunks hat es, und wie viele Zeichen je Token?
-//      Setze den Wert danach zurück; Teil 2 bis 4 nutzen ihn (Teil 4 baut damit den Fragen-Index, den Lektion 05, Teil 3 liest).
+//      Setze den Wert danach zurück; Teil 2 bis 4 nutzen ihn (Teil 4 baut damit den Fragen-Index, den Lektion 07, Teil 3 liest).
 //   3. Schau dir die Spalte "characters per token" an: Welche Chunks liegen deutlich unter 4? Was
 //      steht in ihnen (Tipp: Linklisten)? (Nur aussagekräftig, wenn `counting_method` im Manifest
 //      nicht `character-estimate` ist – dann liegt jeder Wert bei etwa 1.)

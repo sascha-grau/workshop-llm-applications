@@ -72,7 +72,7 @@ function validatedURL(name: string, required = true): string | undefined {
   }
 }
 
-/** Der OpenAI-kompatible Server für Chat und Embeddings (Lektion 01 bis 05). */
+/** Der OpenAI-kompatible Server für Chat und Embeddings (Lektion 01 bis 07). */
 export const remoteModel = {
   /** Name des Chat-Modells, genau so, wie der Server ihn kennt. */
   get name() { return requireEnv('REMOTE_MODEL_NAME'); },
@@ -80,7 +80,7 @@ export const remoteModel = {
   get baseURL() { return validatedURL('REMOTE_MODEL_BASE_URL')!; },
 };
 
-/** Das Embedding-Modell (Lektion 03 bis 05) auf demselben Server wie das Chat-Modell. */
+/** Das Embedding-Modell (Lektion 03 bis 07) auf demselben Server wie das Chat-Modell. */
 export const remoteEmbeddingModel = {
   get name() { return requireEnv('REMOTE_EMBEDDING_MODEL_NAME'); },
   get gemmaName() { return requireEnv('REMOTE_EMBEDDING_GEMMA_MODEL_NAME'); },
@@ -94,6 +94,8 @@ export const settings = {
     return validatedURL('BURP_PROXY_URL', false);
   },
   get burpCACert(): string | undefined { return process.env.BURP_CA_CERT?.trim() || undefined; },
+  /** Adresse von Qdrant, der Vektordatenbank ab Lektion 06. Ohne Eintrag: die Standardadresse eines lokalen Qdrant. */
+  get qdrantURL(): string { return validatedURL('QDRANT_URL', false) ?? 'http://localhost:6333/'; },
   get facadeHost(): string { return process.env.FACADE_HOST?.trim() || '127.0.0.1'; },
 
   /**

@@ -117,7 +117,6 @@ async function main() {
 
   const indexLabels = { answers: 'Index A: answers only', all: 'Index B: answers + similar questions' };
   const variantLabels = { withoutPrefix: 'without prefix', withPrefix: 'with prefix' };
-  type IndexKey = keyof typeof indexLabels;
   type VariantKey = keyof typeof variantLabels;
   type EntryKind = 'correctAnswer' | 'answer' | 'similarQuestion';
 
@@ -141,12 +140,12 @@ async function main() {
           { key: 'withPrefix', queryPrefix: model.queryPrefix, passagePrefix: model.passagePrefix },
         ];
         // Pro Variante: bei wie vielen Anfragen die richtige Antwort auf Platz 1 steht, in Index A und B.
-        const firstPlaceCounts: Record<VariantKey, Record<IndexKey, number>> = {
+        const firstPlaceCounts = {
           withoutPrefix: { answers: 0, all: 0 },
           withPrefix: { answers: 0, all: 0 },
         };
         // Pro Anfrage und Variante: Platz und Scores in Index B.
-        const caseDetails: Record<string, Partial<Record<VariantKey, string>>> = {};
+        const caseDetails: { [query: string]: { withoutPrefix?: string; withPrefix?: string } } = {};
 
         for (const variant of variants) {
           // NEU: Das Präfix ist nur Teil der Eingabe ans Modell. Wer es ändert, muss jeden Eintrag
@@ -176,7 +175,8 @@ async function main() {
             if (bestHitInIndexA.kind === 'correctAnswer') firstPlaceCounts[variant.key].answers++;
             if (rank === 1) firstPlaceCounts[variant.key].all++;
 
-            (caseDetails[query] ??= {})[variant.key] =
+            if (!caseDetails[query]) caseDetails[query] = {};
+            caseDetails[query][variant.key] =
               `Rank ${rank} | Answer ${hits[rank - 1].similarity.toFixed(3)}` +
               ` | Question ${bestSimilarQuestion.similarity.toFixed(3)}`;
           }
@@ -185,17 +185,24 @@ async function main() {
         console.log(
           `\n${model.shortName}: For how many of the ${cases.length} queries is the correct answer ranked first?`,
         );
-        console.table(Object.fromEntries(variants.map(({ key }) => [
-          variantLabels[key], Object.fromEntries(
-            (Object.keys(indexLabels) as IndexKey[]).map((index) => [indexLabels[index], firstPlaceCounts[key][index]]),
-          ),
-        ])));
+        const firstPlaceTable: { [variant: string]: { [index: string]: number } } = {};
+        for (const { key } of variants) {
+          firstPlaceTable[variantLabels[key]] = {
+            [indexLabels.answers]: firstPlaceCounts[key].answers,
+            [indexLabels.all]: firstPlaceCounts[key].all,
+          };
+        }
+        console.table(firstPlaceTable);
         console.log(
           `${model.shortName}, Index B: rank and score of the correct answer, and score of the best similar question`,
         );
-        console.table(Object.fromEntries(Object.entries(caseDetails).map(([query, details]) => [
-          query, Object.fromEntries(variants.map(({ key }) => [variantLabels[key], details[key]])),
-        ])));
+        const detailsTable: { [query: string]: { [variant: string]: string | undefined } } = {};
+        for (const [query, details] of Object.entries(caseDetails)) {
+          const row: { [variant: string]: string | undefined } = {};
+          for (const { key } of variants) row[variantLabels[key]] = details[key];
+          detailsTable[query] = row;
+        }
+        console.table(detailsTable);
       });
     } catch (error) {
       logError(error);

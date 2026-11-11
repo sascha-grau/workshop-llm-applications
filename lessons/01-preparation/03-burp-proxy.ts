@@ -9,7 +9,8 @@
 // Projektdateien nicht, ohne ihn vorher zu schwärzen.
 //
 // Voraussetzungen: LM Studio (Server gestartet) und Open WebUI laufen. Burp ist in diesem Teil der Kern, aber
-//   technisch optional: Ist BURP_PROXY_URL gesetzt (siehe .env.example), muss Burp laufen (Intercept aus).
+//   technisch optional. In `.env.example` ist BURP_PROXY_URL leer, der Proxy ist also freiwillig. Für diesen Teil trägst du
+//   in `.env` BURP_PROXY_URL=http://localhost:8080 ein (der Standard-Listener von Burp). Ist die Adresse gesetzt, muss Burp laufen (Intercept aus).
 //   Ohne BURP_PROXY_URL läuft das Programm ohne Proxy und du siehst nichts in Burp.
 //   Burp Community: https://portswigger.net/burp/communitydownload
 //   CA-Zertifikat (nur HTTPS, ab Lektion 02, Teil 2): https://portswigger.net/burp/documentation/desktop/external-browser-config/certificate (nur exportieren, nicht im Browser installieren; siehe README.de.md im Repo-Root)
@@ -34,14 +35,18 @@ import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-01-part-3';
+const MODEL_TIMEOUT_MS = 60_000;
 
 async function main() {
   // NEU: Ab hier läuft jede ausgehende Anfrage dieses Prozesses über Burp (falls konfiguriert).
+  // Der "Dispatcher" ist das Objekt von undici (Nodes HTTP-Client), das entscheidet, über welche Verbindung eine Anfrage
+  // rausgeht; ein Proxy-Dispatcher schickt sie über Burp. `setGlobalDispatcher` macht ihn zum Standard für alle Anfragen.
   // Später in Lektion 02, Teil 2 gilt das auch für das Laden von Webseiten.
   // Ab Lektion 02 erledigt `useBurpIfConfigured()` dasselbe in einer Zeile.
   if (getBurpDispatcher()) setGlobalDispatcher(getBurpDispatcher()!);
 
   const model = new ChatOpenAI({
+    timeout: MODEL_TIMEOUT_MS,
     model: remoteModel.name,
     apiKey: remoteModel.apiKey,
     // Wiederholungen würden in Burp als verwirrende Doppelanfragen auftauchen: lieber sofort scheitern.

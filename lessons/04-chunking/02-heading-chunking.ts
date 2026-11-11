@@ -6,8 +6,8 @@
 // Teil 1 (`01-prepared-chunks.ts`) liest vorbereitete Chunks und bettet sie unverändert ein. Hier
 // schneidet das Programm diese Chunks weiter, an den Markdown-Überschriften: Jeder Abschnitt wird
 // ein Chunk. Jeder Chunk beginnt mit seinem Überschriftenpfad (Dokumenttitel › Abschnitt ›
-// Unterabschnitt), damit er auch allein verständlich ist. Dieser Pfad wird später in Lektion 05
-// als Quellenangabe angezeigt.
+// Unterabschnitt), damit er auch allein verständlich ist. Dieser Pfad wird später in Lektion 07
+// (RAG) als Quellenangabe angezeigt.
 //
 // Das Programm braucht kein eigenes Token-Limit: Teil 0 hat jeden vorbereiteten Chunk gegen das
 // Limit des Embedding-Modells geprüft, und Schneiden an Überschriften macht Chunks nur kleiner. Der
@@ -21,7 +21,7 @@
 // und mischt mehrere Abschnitte, sein Vektor ist ein Mittelwert aus allen. Ein Chunk mit genau
 // einem Abschnitt hat einen Vektor für genau dieses Thema, und eine Frage dazu findet ihn direkt.
 //
-// Dieser Index (`headings`) ist die Grundlage von Lektion 05: RAG lädt genau diese Datei.
+// Dieser Index (`headings`) ist die Grundlage von Lektion 05 bis 07: Die Retrieval-Strategien, Hybrid-Suche und Reranking (Qdrant) sowie RAG (Teil 1) laden genau diese Datei.
 //
 // Voraussetzungen: LM Studio läuft mit gestartetem Server und geladenem E5-Modell; die
 // vorbereiteten Chunks existieren (`npm run l04:0`). Burp ist optional.
@@ -32,15 +32,15 @@
 //      `#{1,3}` auf `#{1,2}`. Wie ändert sich die Zahl der Chunks, und was passiert mit den Treffern?
 //   2. Trage in `SUBSET` einen Dokumentnamen ein (z. B. den von EXAMPLE_DOCUMENT), dann läuft das
 //      Einbetten schneller.
-//      Setze `SUBSET` danach wieder auf `[]` und starte `npm run l04:2` neu, sonst kennt Lektion 05, Teil 1 nur dieses Dokument.
+//      Setze `SUBSET` danach wieder auf `[]` und starte `npm run l04:2` neu, sonst kennen Lektion 05 bis 07 nur dieses Dokument.
 //   3. Ändere `DEMO_QUESTION` in chunking.ts und vergleiche die besten drei Treffer (`DEFAULT_TOP_K`) mit Teil 1.
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
 import { e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
-import { writeIndex, readIndex, DEFAULT_TOP_K, type IndexEntry, type ChunkMetadata } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, EXAMPLE_DOCUMENT, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readChunks, sourcesFor, sectionPath } from './chunking.ts';
+import { writeIndex, readIndex, DEFAULT_TOP_K, sectionPath, type IndexEntry, type ChunkMetadata } from '../shared/index.ts';
+import { requirePreparedChunks, embedTexts, EXAMPLE_DOCUMENT, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readChunks, sourcesFor } from './chunking.ts';
 import { runMain } from '../shared/startup.ts';
 
 // Leer heißt: der ganze Korpus. Eine Liste von Dokumentnamen indexiert nur diese Dokumente
@@ -79,7 +79,7 @@ async function main() {
         const vectors = await embedTexts(chunks.map(({ text }) => `${e5Model.passagePrefix}${text}`));
         embeddingCalls += 1;
         // NEU: Die Metadaten enthalten den Überschriftenpfad (als Liste) und die Zugriffsgruppe. Die Zugriffsgruppe wird
-        // hier nur gespeichert und schützt noch nichts; gefiltert wird erst in Lektion 05. Ein Dokument,
+        // hier nur gespeichert und schützt noch nichts; gefiltert wird erst ab Lektion 05 (Teil 3). Ein Dokument,
         // das nicht als intern geführt ist, bekommt "public", intern ist "internal".
         chunks.forEach(({ headingPath, text }, position) => entries.push({
           text,

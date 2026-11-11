@@ -6,7 +6,7 @@
 // Eine Suchanfrage wird mit mehreren gespeicherten Passagen verglichen: Jeder Text wird einmal
 // eingebettet, dann werden die Passagen nach Kosinus-Ähnlichkeit zur Anfrage sortiert. Dasselbe
 // Muster nutzt RAG (Retrieval-Augmented Generation): Passende Textstücke suchen und sie dem
-// Sprachmodell als Kontext mitgeben (Lektion 05).
+// Sprachmodell als Kontext mitgeben (Lektion 07).
 //
 // Anfrage und Passagen laufen durch zwei Embedding-Modelle auf demselben Server: E5 und
 // EmbeddingGemma. Jedes Modell gibt sein eigenes Ranking aus.

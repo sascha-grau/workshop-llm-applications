@@ -2,10 +2,10 @@
 
 [Deutsch](README.de.md)
 
-**Learning goal:** You understand what an embedding is, compare texts with cosine similarity, and see what the prefixes `query: ` and `passage: ` are for. This is the foundation of the search in Lessons 04 and 05.
+**Learning goal:** You understand what an embedding is, compare texts with cosine similarity, and see what the prefixes `query: ` and `passage: ` are for. This is the foundation of the search in Lessons 04 to 07.
 
 | Part | File | npm script | Learning goal | Requires |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | `01-hello-embeddings.ts` | `npm run l03:1` | Embed two sentences and measure their similarity | LM Studio (E5), Burp optional |
 | 2 | `02-comparisons.ts` | `npm run l03:2` | Sort passages by meaning, compare E5 with EmbeddingGemma | LM Studio (E5 and EmbeddingGemma), Burp optional |
 | 3 | `03-prefixes.ts` | `npm run l03:3` | Measure how much the role prefixes matter | LM Studio (E5 and EmbeddingGemma), Burp optional |

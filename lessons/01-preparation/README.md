@@ -5,12 +5,12 @@
 **Learning goal:** You call a language model from TypeScript, connect it to a chat interface (Open WebUI), and see in Burp what really goes over the wire. After that, the environment is ready for all further lessons.
 
 | Part | File | npm script | Learning goal | Requires |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | `01-hello-llm.ts` | `npm run l01:1` | Send a prompt, stream the answer token by token | LM Studio |
 | 2 | `02-open-webui.ts` | `npm run l01:2` | Offer the program as model `lesson-01-part-2` in Open WebUI (facade) | LM Studio, Open WebUI |
 | 3 | `03-burp-proxy.ts` | `npm run l01:3` | Read requests and responses in Burp's HTTP history (model `lesson-01-part-3`) | LM Studio, Open WebUI, Burp |
 
-**Order:** Start with Part 1 and work through the parts in order; each builds on the previous one. Burp is optional as long as `BURP_PROXY_URL` is empty (without Burp: clear the entry in `.env`). If it is set, Burp must be running (Intercept off).
+**Order:** Start with Part 1 and work through the parts in order; each builds on the previous one. `BURP_PROXY_URL` is empty in `.env.example`, so Burp is optional. For Part 3, set `BURP_PROXY_URL=http://localhost:8080` in `.env` (Burp's default listener). Once it is set, Burp must be running (Intercept off); without Burp, leave it empty.
 
 Setup (Node, LM Studio, `.env`, Open WebUI, Burp): see the [root README](../../README.md). Infrastructure: [`lessons/shared/README.md`](../shared/README.md).
 

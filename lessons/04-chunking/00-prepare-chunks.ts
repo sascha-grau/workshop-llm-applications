@@ -42,8 +42,8 @@
 //
 // Voraussetzungen: LM Studio läuft mit gestartetem Server (Port 1234), und das E5-Modell
 // (REMOTE_EMBEDDING_MODEL_NAME) ist geladen. Burp wird nicht gebraucht. Diesen Teil musst du einmal
-// ausführen, bevor Lektion 04, Teil 1 bis 4 laufen. Lektion 05 braucht nur ihren Index (aus Teil 2, 3
-// oder 4), und der entsteht aus diesen Chunks.
+// ausführen, bevor Lektion 04, Teil 1 bis 5 laufen. Lektion 05 bis 07 brauchen nur die Indizes (aus Teil 2, 3
+// oder 4), und die entstehen aus diesen Chunks.
 // Start: npm run l04:0
 //
 // Aufgabe:

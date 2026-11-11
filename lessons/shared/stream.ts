@@ -55,11 +55,12 @@ export function requestAbortSignal(chatResponse: Parameters<ChatHandler>[2]): Ab
   return controller.signal;
 }
 
-/** Sendet `source` als NDJSON-Stream und wartet, wenn Open WebUI die Daten langsamer abnimmt (`drain`). */
+// TODO(doc): NDJSON mit optionalem Footer vor done: true senden; Abbruch und Rückstau (drain) beachten.
 export async function sendChatStream(
   chatResponse: Parameters<ChatHandler>[2],
   source: string | AsyncIterable<{ text: string }>,
   signal: AbortSignal = requestAbortSignal(chatResponse),
+  options: { footer?: string } = {},
 ): Promise<void> {
   const response = rawResponse(chatResponse);
   signal.throwIfAborted();
@@ -93,6 +94,7 @@ export async function sendChatStream(
   } else {
     for await (const chunk of source) await write(chunk.text);
   }
+  if (options.footer) await write(options.footer);
   signal.throwIfAborted();
   response.write(`${JSON.stringify({ done: true })}\n`);
   response.end();

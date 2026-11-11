@@ -44,6 +44,7 @@
 //      lösche den Index und vergleiche.
 //   3. Ändere `DEMO_QUESTION` in chunking.ts auf eine Frage, die ein Chunk beantwortet, ohne ihre Wörter
 //      zu benutzen. Findet die Suche nach Fragen ihn besser als die Suche nach Chunk-Text (Teil 2)?
+import { stripJsonFence } from '../shared/text.ts';
 import { ChatOpenAI } from '@langchain/openai';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { z } from 'zod';
@@ -51,8 +52,8 @@ import { remoteModel, remoteEmbeddingModel } from '../shared/config.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
 import { CHARACTERS_PER_TOKEN, e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
-import { indexFileFor, DEFAULT_TOP_K, chunkKey, uniqueChunks, type QuestionEntry } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, DEMO_QUESTION, EXAMPLE_DOCUMENT, readChunks, sourcesFor, sectionPath, previewChunk, metadataFor, printStats, searchTop, readQuestionIndex, hasChunk, appendQuestionChunk } from './chunking.ts';
+import { indexFileFor, DEFAULT_TOP_K, chunkKey, uniqueChunks, sectionPath, type QuestionEntry } from '../shared/index.ts';
+import { requirePreparedChunks, embedTexts, DEMO_QUESTION, EXAMPLE_DOCUMENT, readChunks, sourcesFor, previewChunk, metadataFor, printStats, searchTop, readQuestionIndex, hasChunk, appendQuestionChunk } from './chunking.ts';
 import { runMain } from '../shared/startup.ts';
 
 // false: nur das Beispieldokument (schnell). true: der ganze Korpus (Hunderte Modellaufrufe, viele
@@ -169,7 +170,7 @@ async function main() {
                   `${QUESTION_FORMAT_EXAMPLE}. Alle Fragen müssen auf Deutsch sein.\n\n${text}`,
                 );
                 const answer = response.text.trim();
-                const json = /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(answer)?.[1] ?? answer;
+                const json = stripJsonFence(answer);
                 return questionSchema.parse(JSON.parse(json));
               }));
             } catch (error) {
@@ -188,7 +189,7 @@ async function main() {
             const metadata = metadataFor(source, position, { headingPath });
             // KERN: Multi-Vektor-Einträge. Ein Eintrag pro Frage: gleicher Text und gleiche Metadaten, nur die Frage (und später
             // der Vektor) unterscheidet sich. Der Index speichert den Chunk-Text, weil ihn ein
-            // RAG-Prompt braucht (Lektion 05).
+            // RAG-Prompt braucht (Lektion 07, Teil 3).
             const newEntries = questions.map((generatedQuestion) => ({ generatedQuestion, text, metadata }));
 
             // Die Fragen sind Anfragen, also bekommen sie das Anfrage-Präfix, nicht das Passage-Präfix.

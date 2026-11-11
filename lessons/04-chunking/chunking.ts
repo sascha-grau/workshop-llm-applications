@@ -1,22 +1,24 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { z } from 'zod';
-import { assertVectorCount, e5Model } from '../shared/embeddings.ts';
-import { contentDirectory } from '../shared/paths.ts';
-import { MANIFEST_FILE, manifestSchema, type Manifest } from './formats.ts';
-import { embeddings, indexFileFor, readIndex, rankEntries, writeIndex, indexCommands, requireEntries, chunkKey, questionEntrySchema, INTERNAL_DOCUMENTS, HEADING_SEPARATOR, type ChunkMetadata, type IndexEntry, type QuestionEntry } from '../shared/index.ts';
-
 // Gemeinsame Hilfsfunktionen für Lektion 04 (erstmals in 01-prepared-chunks.ts benutzt): alles, was
 // in allen Teilen identisch sein muss, damit sich ihre Ergebnisse vergleichen lassen. Das
 // Schneiden steht in den Teilen selbst. Die Index-Funktionen (Dateien lesen und schreiben, Ranking)
-// liegen in `shared/index.ts`, weil auch Lektion 05 sie braucht; die Teile importieren sie von dort
+// liegen in `shared/index.ts`, weil auch Lektion 05 bis 07 sie brauchen; die Teile importieren sie von dort
 // direkt. Hier liegen:
 // - Konfiguration: `DEMO_QUESTION`, Pfade, Korpus-Konstanten
 // - Manifest und Chunks lesen: readManifest, readChunk(s), splitByHeadings, sourcesFor, percentile
 // - Metadaten: metadataFor (inkl. Zugriffsgruppe `accessGroup`: "public" oder "internal")
 // - Dateiformate: `formats.ts` (Versionsnummer und zod-Schema des Manifests; alte Dateien werden abgelehnt)
 // - Suche und Ausgabe: embedTexts, searchTop (Top-k-Suche; Teil 1 bis 3 rufen sie mit `DEFAULT_TOP_K` aus `shared/index.ts` auf), printStats, printHits
+// - Satzzerlegung für Teil 3: prepareSemanticChunk (Sätze und Überschriften eines vorbereiteten Chunks)
 // - Fragen-Index aus Teil 4: Fortsetzen und atomares Speichern (readQuestionIndex, appendQuestionChunk)
+// - Kinder für Teil 5: splitIntoChildren (Lektion 05, Teil 5 und Lektion 07, Teil 4 importieren es von hier)
+
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { z } from 'zod';
+import { assertVectorCount, e5Model } from '../shared/embeddings.ts';
+import { contentDirectory } from '../shared/paths.ts';
+import { MANIFEST_FILE, manifestSchema, type Manifest } from './formats.ts';
+import { embeddings, indexFileFor, readIndex, rankEntries, writeIndex, indexCommands, requireEntries, chunkKey, questionEntrySchema, INTERNAL_DOCUMENTS, HEADING_SEPARATOR, sectionPath, type ChunkMetadata, type IndexEntry, type QuestionEntry } from '../shared/index.ts';
 
 // Alle Teile stellen dieselbe Frage; nur die Art, wie die Chunks geschnitten wurden, unterscheidet
 // sich. Ändere sie hier, um eine eigene auszuprobieren.
@@ -85,10 +87,6 @@ export const metadataFor = (source: string, position: number, { headingPath, chu
   accessGroup: INTERNAL_DOCUMENTS.includes(source) ? 'internal' : 'public',
 });
 
-// Der Pfad ohne Dokumenttitel, nur für die Anzeige mit " › " verbunden (gespeichert wird er als
-// Liste): Die Tabellen zeigen ein Dokument oder nennen die Datei ohnehin, und
-// der volle Pfad passte nicht auf den Bildschirm. "–" steht für Text direkt unter dem Titel.
-export const sectionPath = (headingPath?: string[]) => headingPath?.slice(1).join(HEADING_SEPARATOR) || '–';
 // Vorschau für einen Chunk mit Überschriftenpfad: der Anfang seines eigenen Texts, ohne den
 // Pfad davor (previewText ist die Variante für Chunks ohne Pfad).
 export const previewChunk = ({ headingPath, text }: Chunk) => text.slice(headingPath?.join(HEADING_SEPARATOR).length ?? 0).trim().slice(0, 60).replace(/\s+/g, ' ');
@@ -106,9 +104,12 @@ export function splitByHeadings(markdown: string): Chunk[] {
   // Die Überschriften über dem aktuellen Abschnitt, nach Ebene: [Titel, Abschnitt, Unterabschnitt].
   const headingStack: string[] = [];
 
-  // Das Lookahead schneidet vor jeder Überschriftenzeile, ohne sie zu entfernen; jeder Abschnitt
-  // beginnt also mit seiner eigenen Überschrift.
+  // Das Lookahead `(?=…)` schneidet vor jeder Überschriftenzeile, ohne sie zu entfernen; jeder Abschnitt
+  // beginnt also mit seiner eigenen Überschrift. Das Flag `m` lässt `^` an jedem Zeilenanfang gelten,
+  // nicht nur am Textanfang.
   return markdown.split(/^(?=#{1,3} )/m).flatMap((section) => {
+    // Regex: 1 bis 3 `#`, ein Leerzeichen, dann der Titel. Gruppe 1 sind die `#` (ihre Zahl ist die
+    // Ebene), Gruppe 2 der Titel. Kein Treffer heißt: Text vor der ersten Überschrift.
     const heading = /^(#{1,3}) (.*)/.exec(section);
     if (heading) {
       const level = heading[1].length;
@@ -194,7 +195,8 @@ export function readQuestionIndex(questionsPerChunk: number): QuestionEntry[] {
     validateQuestionEntries(index, questionsPerChunk);
     return index;
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
+    const cause = error instanceof Error ? error.cause : error;
+    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return [];
     throw new Error(`Cannot load the question index ${file}. Check the file and QUESTIONS_PER_CHUNK, or regenerate it with npm run l04:0 followed by npm run ${indexCommands.questions}.`, { cause: error });
   }
 }
@@ -224,4 +226,89 @@ export function printHits(hits: (IndexEntry & { similarity: number })[]): void {
     section: sectionPath(metadata.headingPath),
     preview: metadata.headingPath?.length ? previewChunk({ headingPath: metadata.headingPath, text }) : previewText(text),
   })));
+}
+
+// Ein Kind ist ein Index-Eintrag (Text, Vektor, Metadaten) mit Verweis auf seinen Parent.
+export type Child = IndexEntry & { parent: IndexEntry };
+
+// Teilt einen Parent in Stücke von etwa `childSize` Zeichen (ein kurzer Parent bleibt ein Kind).
+// Der Überschriftenpfad steht am Anfang des Parent-Textes; er wird abgetrennt und jedem Kind
+// wieder vorangestellt, damit jedes Stück weiß, wohin es gehört. Geschnitten wird nach Zeichen, auch
+// mitten im Wort. Der Vektor fehlt noch (`Omit`): ihn setzt `buildChildren`.
+export function splitIntoChildren(parent: IndexEntry, childSize: number): Omit<Child, 'vector'>[] {
+  const path = parent.metadata.headingPath?.join(HEADING_SEPARATOR) ?? '';
+  const body = parent.text.slice(path.length).trim();
+  const count = Math.max(1, Math.round(body.length / childSize));
+  return Array.from({ length: count }, (_unused, position) => {
+    const piece = body.slice(Math.round((position * body.length) / count), Math.round(((position + 1) * body.length) / count));
+    return { text: [path, piece.trim()].filter(Boolean).join('\n\n'), metadata: parent.metadata, parent };
+  });
+}
+
+
+/**
+ * Der Text zwischen zwei Überschriften eines vorbereiteten Chunks. `heading` ist die Überschrift
+ * (oder sind die Überschriften) davor, samt Zeilenumbrüchen, und kann leer sein. `distances` hat
+ * einen Eintrag weniger als `sentences`.
+ */
+export type HeadingSection = { heading: string; sentences: string[]; distances: number[] };
+/** Eine vorbereitete Chunk-Datei; ihre führenden Überschriften sind von den Abschnitten des Textes getrennt. */
+export type PreparedChunk = { chunkFile: string; leadingHeadingBlock: string; sections: HeadingSection[] };
+
+// Zerlegt Text nach den Regeln der Sprache in Sätze. Jede nicht leere Zeile gilt als eigener Satz,
+// auch ein Listenpunkt ohne Punkt am Ende.
+const segmenter = new Intl.Segmenter('de', { granularity: 'sentence' });
+export function prepareSemanticChunk(chunkFile: string) {
+  const text = readChunk(chunkFile);
+  // Die Überschriftenzeilen am Anfang (Dokumenttitel, Abschnittsüberschriften) samt leeren Zeilen
+  // dazwischen. Sie werden nicht zerlegt und stehen vor jedem Stück, damit jedes Stück auch
+  // allein verständlich ist.
+  // Regex: ab Textanfang (`^`) beliebig viele (`*`) Zeilen, die entweder leer sind
+  // (`[ \t]*\r?\n`) oder eine Überschrift `#` bis `###` samt Zeilenende (`#{1,3}[ \t]+…`). Die erste
+  // Zeile mit echtem Text beendet den Treffer; ohne Treffer bleibt der Block leer.
+  const leadingHeadingBlock = /^(?:[ \t]*\r?\n|#{1,3}[ \t]+[^\r\n]*(?:\r?\n|$))*/.exec(text)?.[0] ?? '';
+  const body = text.slice(leadingHeadingBlock.length);
+  // Der Text wird vor jeder Überschriftenzeile in Abschnitte geteilt. Das Lookahead lässt die
+  // Überschrift beim Text darunter. Weder diese noch die führenden Überschriften sind Teil eines
+  // Fensters, eine Überschrift nimmt also nie an einem Abstand teil. Text vor der ersten
+  // Überschrift, falls es welchen gibt, ist ein Abschnitt ohne Überschrift.
+  // Eine Überschrift ohne Text darunter (direkt gefolgt von der nächsten) wird in
+  // `pendingHeadings` zum nächsten Abschnitt mitgenommen, damit kein Stück nur aus einer
+  // Überschrift besteht.
+  let pendingHeadings = '';
+  // Regex 1 (split): `(?=…)` ist ein Lookahead und schneidet vor jeder Zeile (`m` = Zeilenanfang
+  // gilt für `^`), die mit `#` bis `###` und einem Leerzeichen beginnt, ohne etwas zu entfernen.
+  // Regex 2 (exec): holt die Überschriftenzeile samt Zeilenende vom Anfang eines Abschnitts.
+  const sections = body.split(/^(?=#{1,3}[ \t]+)/m).flatMap((section) => {
+    const headingLine = /^#{1,3}[ \t]+[^\r\n]*(?:\r?\n|$)/.exec(section)?.[0] ?? '';
+    const sectionBody = section.slice(headingLine.length);
+    if (!sectionBody.trim()) {
+      pendingHeadings += section;
+      return [];
+    }
+    const heading = `${pendingHeadings}${headingLine}`;
+    pendingHeadings = '';
+    const sentences: string[] = [];
+    // Ein Segment nur aus Leerraum (eine Leerzeile) ist kein Satz: Es bekäme ein eigenes Fenster
+    // und einen eigenen Abstand, und das Modell hätte nichts zu vergleichen. Würde man es
+    // weglassen, verschwänden die Zeilenumbrüche aus dem Chunk-Text. Deshalb wird es an den
+    // Satz davor gehängt, oder an den nächsten, falls noch keiner kam.
+    let leadingWhitespace = '';
+    for (const { segment } of segmenter.segment(sectionBody)) {
+      if (segment.trim()) {
+        sentences.push(`${leadingWhitespace}${segment}`);
+        leadingWhitespace = '';
+      } else if (sentences.length > 0) {
+        sentences[sentences.length - 1] += segment;
+      } else {
+        leadingWhitespace += segment;
+      }
+    }
+    return [{ heading, sentences }];
+  });
+  // Überschriften ganz am Ende haben keinen Abschnitt nach sich. Sie bleiben als eigener Abschnitt
+  // erhalten, damit kein Text des vorbereiteten Chunks verloren geht. Ein vorbereiteter Chunk mit
+  // Überschriften, aber ohne Text, ergibt am Ende gar keinen Abschnitt und keinen Chunk.
+  if (pendingHeadings) sections.push({ heading: pendingHeadings, sentences: [] });
+  return { chunkFile, leadingHeadingBlock, sections };
 }

@@ -32,6 +32,12 @@ import { runMain } from '../shared/startup.ts';
 const ADVERTISED_MODEL = 'lesson-02-part-4';
 // Ein Tool-Durchlauf bedeutet mindestens zwei Modell-Aufrufe, also mehr Zeit als eine einfache Antwort.
 const MODEL_TIMEOUT_MS = 120_000;
+const MAX_TOOL_ROUNDS = 5;
+// Das Limit für `agent.invoke` (`recursionLimit: 2 * MAX_TOOL_ROUNDS`): `createAgent` läuft als Graph, und eine
+// Tool-Runde besteht aus zwei Schritten (Modell aufrufen, Werkzeug ausführen). Zwei Schritte pro Runde ergeben
+// also höchstens MAX_TOOL_ROUNDS Runden; danach wirft LangChain einen Fehler, statt endlos weiterzuschleifen.
+// Das ist das ausdrückliche Gegenstück zu `MAX_TOOL_ROUNDS` aus Teil 3, wo die Schleife selbst zählt:
+// Ein Modell, das immer wieder Werkzeuge anfordert, darf keine unbegrenzten Aufrufe auslösen (OWASP LLM10, Unbounded Consumption).
 
 async function main() {
   useBurpIfConfigured();
@@ -79,7 +85,7 @@ async function main() {
     const signal = requestAbortSignal(chatResponse);
     await logInvocation('Model', { messages: chatRequest.messages.length }, async () => {
       // NEU: Ein einziger Aufruf ersetzt die ganze Schleife aus Teil 3.
-      const response = await agent.invoke({ messages: toPlainMessages(chatRequest.messages) }, { signal });
+      const response = await agent.invoke({ messages: toPlainMessages(chatRequest.messages) }, { signal, recursionLimit: 2 * MAX_TOOL_ROUNDS });
 
       // Die letzte Nachricht ist die endgültige Antwort des Modells; die davor sind der Tool-Durchlauf.
       const answer = response.messages.at(-1)?.text;

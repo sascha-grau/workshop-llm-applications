@@ -52,7 +52,7 @@ import { checkModelServer } from '../shared/diagnostics.ts';
 import { cosineSimilarity, e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
 import { writeIndex, readIndex, DEFAULT_TOP_K, type IndexEntry, type ChunkMetadata } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, EXAMPLE_DOCUMENT, previewText, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readManifest, readChunk, percentile } from './chunking.ts';
+import { requirePreparedChunks, embedTexts, EXAMPLE_DOCUMENT, previewText, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readManifest, prepareSemanticChunk, type HeadingSection, type PreparedChunk, percentile } from './chunking.ts';
 import type { Manifest } from './formats.ts';
 import { runMain } from '../shared/startup.ts';
 
@@ -72,18 +72,6 @@ async function main() {
 
 
   type SemanticChunk = { chunkFile: string; text: string };
-  /**
-   * Der Text zwischen zwei Überschriften eines vorbereiteten Chunks. `heading` ist die Überschrift
-   * (oder sind die Überschriften) davor, samt Zeilenumbrüchen, und kann leer sein. `distances` hat
-   * einen Eintrag weniger als `sentences`.
-   */
-  type HeadingSection = { heading: string; sentences: string[]; distances: number[] };
-  /** Eine vorbereitete Chunk-Datei; ihre führenden Überschriften sind von den Abschnitten des Textes getrennt. */
-  type PreparedChunk = { chunkFile: string; leadingHeadingBlock: string; sections: HeadingSection[] };
-
-  // Zerlegt Text nach den Regeln der Sprache in Sätze. Jede nicht leere Zeile gilt als eigener Satz,
-  // auch ein Listenpunkt ohne Punkt am Ende.
-  const segmenter = new Intl.Segmenter('de', { granularity: 'sentence' });
   const manifest = readManifest();
 
   /**
@@ -96,54 +84,9 @@ async function main() {
    * Stücke können sehr klein werden.
    */
   async function splitSemantically(document: Manifest['sources'][number]) {
-    const preparedChunks = document.chunks.map(({ file: chunkFile }) => {
-      const text = readChunk(chunkFile);
-      // Die Überschriftenzeilen am Anfang (Dokumenttitel, Abschnittsüberschriften) samt leeren Zeilen
-      // dazwischen. Sie werden nicht zerlegt und stehen vor jedem Stück, damit jedes Stück auch
-      // allein verständlich ist.
-      const leadingHeadingBlock = /^(?:[ \t]*\r?\n|#{1,3}[ \t]+[^\r\n]*(?:\r?\n|$))*/.exec(text)?.[0] ?? '';
-      const body = text.slice(leadingHeadingBlock.length);
-      // Der Text wird vor jeder Überschriftenzeile in Abschnitte geteilt. Das Lookahead lässt die
-      // Überschrift beim Text darunter. Weder diese noch die führenden Überschriften sind Teil eines
-      // Fensters, eine Überschrift nimmt also nie an einem Abstand teil. Text vor der ersten
-      // Überschrift, falls es welchen gibt, ist ein Abschnitt ohne Überschrift.
-      // Eine Überschrift ohne Text darunter (direkt gefolgt von der nächsten) wird in
-      // `pendingHeadings` zum nächsten Abschnitt mitgenommen, damit kein Stück nur aus einer
-      // Überschrift besteht.
-      let pendingHeadings = '';
-      const sections = body.split(/^(?=#{1,3}[ \t]+)/m).flatMap((section) => {
-        const headingLine = /^#{1,3}[ \t]+[^\r\n]*(?:\r?\n|$)/.exec(section)?.[0] ?? '';
-        const sectionBody = section.slice(headingLine.length);
-        if (!sectionBody.trim()) {
-          pendingHeadings += section;
-          return [];
-        }
-        const heading = `${pendingHeadings}${headingLine}`;
-        pendingHeadings = '';
-        const sentences: string[] = [];
-        // Ein Segment nur aus Leerraum (eine Leerzeile) ist kein Satz: Es bekäme ein eigenes Fenster
-        // und einen eigenen Abstand, und das Modell hätte nichts zu vergleichen. Würde man es
-        // weglassen, verschwänden die Zeilenumbrüche aus dem Chunk-Text. Deshalb wird es an den
-        // Satz davor gehängt, oder an den nächsten, falls noch keiner kam.
-        let leadingWhitespace = '';
-        for (const { segment } of segmenter.segment(sectionBody)) {
-          if (segment.trim()) {
-            sentences.push(`${leadingWhitespace}${segment}`);
-            leadingWhitespace = '';
-          } else if (sentences.length > 0) {
-            sentences[sentences.length - 1] += segment;
-          } else {
-            leadingWhitespace += segment;
-          }
-        }
-        return [{ heading, sentences }];
-      });
-      // Überschriften ganz am Ende haben keinen Abschnitt nach sich. Sie bleiben als eigener Abschnitt
-      // erhalten, damit kein Text des vorbereiteten Chunks verloren geht. Ein vorbereiteter Chunk mit
-      // Überschriften, aber ohne Text, ergibt am Ende gar keinen Abschnitt und keinen Chunk.
-      if (pendingHeadings) sections.push({ heading: pendingHeadings, sentences: [] });
-      return { chunkFile, leadingHeadingBlock, sections };
-    });
+    // Die Satzzerlegung und das Trennen der Überschriften (mit ihren Regex-Erklärungen) stehen in
+    // `prepareSemanticChunk` in chunking.ts; hier beginnt der eigentliche Kern dieses Teils.
+    const preparedChunks = document.chunks.map(({ file }) => prepareSemanticChunk(file));
 
     const measuredPreparedChunks: PreparedChunk[] = [];
     // Anfragen für die Fenster: eine pro vorbereitetem Chunk, der Sätze hat.

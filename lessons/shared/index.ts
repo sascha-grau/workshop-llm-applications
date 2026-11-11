@@ -1,4 +1,4 @@
-// Indexdateien unter `indexes/` lesen und schreiben, Ranking. Lektion 04 schreibt die Indizes, Lektion 05 liest sie.
+// Indexdateien unter `indexes/` lesen und schreiben, Ranking. Lektion 04 schreibt die Indizes, die Lektionen 05 bis 07 lesen sie (Lektion 06 lädt sie in Qdrant).
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
@@ -8,7 +8,7 @@ import { indexesDirectory } from './paths.ts';
 
 // Format der Indexdateien; erhöhe die Zahl, wenn sich ihre Form ändert (alte Dateien werden dann abgelehnt).
 export const INDEX_FORMAT_VERSION = 2;
-// Wie viele Treffer die Suche in Lektion 04 standardmäßig behält (Lektion 05 setzt ein eigenes `TOP_K` je Datei).
+// Wie viele Treffer die Suche in Lektion 04 standardmäßig behält (die Lektionen 05 bis 07 setzen eigene Werte je Datei).
 export const DEFAULT_TOP_K = 3;
 // Die vier Schneide-Strategien von Lektion 04; je Strategie gibt es eine Indexdatei.
 export type Strategy = 'prepared' | 'headings' | 'semantic' | 'questions';
@@ -19,13 +19,17 @@ export const indexCommands: Record<Strategy, string> = {
 
 // Trennzeichen, mit dem ein Überschriftenpfad (als Liste gespeichert) für die Anzeige zu Text wird.
 export const HEADING_SEPARATOR = ' › ';
+// Der Pfad ohne Dokumenttitel, nur für die Anzeige mit " › " verbunden (gespeichert wird er als
+// Liste): Die Tabellen zeigen ein Dokument oder nennen die Datei ohnehin, und der volle Pfad
+// passte nicht auf den Bildschirm. "–" steht für Text direkt unter dem Titel.
+export const sectionPath = (headingPath?: string[]) => headingPath?.slice(1).join(HEADING_SEPARATOR) || '–';
 
 /** Ein Eintrag der Indexdatei: der Chunk-Text, seine Herkunft und sein Vektor. */
 export type IndexEntry<TMetadata = ChunkMetadata> =
   Omit<z.infer<typeof indexEntrySchema>, 'metadata'> & { metadata: TMetadata };
 
 // Der gemeinsame Embedding-Client (Fabrik aus shared/embeddings.ts: Fließkommazahlen, Zeilenumbrüche
-// bleiben erhalten, keine Wiederholungen), für alle Teile von Lektion 04 und für Lektion 05.
+// bleiben erhalten, keine Wiederholungen), für alle Teile von Lektion 04 bis 07.
 export const embeddings = createEmbeddings();
 
 /**
@@ -38,7 +42,7 @@ export function indexFileFor(strategy: Strategy): string {
 }
 
 // Die Dokumente tragen selbst keine Zugriffsinformation. Der Anhang steht stellvertretend für ein
-// Dokument, das nicht jeder lesen darf (Lektion 05 filtert ihn aus der Suche).
+// Dokument, das nicht jeder lesen darf (die Lektionen 05 und 07 filtern ihn aus der Suche; Lektion 06 sucht bewusst ungefiltert).
 export const INTERNAL_DOCUMENTS = ['11-appendix-llm-application-architecture-and-threat-modeling.md'];
 
 /**
@@ -46,6 +50,12 @@ export const INTERNAL_DOCUMENTS = ['11-appendix-llm-application-architecture-and
  * vorbereitete Chunk, aus dem das Stück geschnitten wurde; mehrere Einträge können ihn teilen.
  */
 export type ChunkMetadata = z.infer<typeof indexEntrySchema>['metadata'];
+
+// Der Zugriffsfilter von Lektion 05 und 07: Ein Chunk gilt nur dann als öffentlich, wenn seine
+// Metadaten "public" sagen UND sein Dokument nicht als intern geführt ist. Die zweite Prüfung
+// fängt einen falsch beschrifteten oder von Hand bearbeiteten Index ab: im Zweifel draußen.
+export const isPublicChunk = ({ accessGroup, source }: Pick<ChunkMetadata, 'accessGroup' | 'source'>) =>
+  accessGroup === 'public' && !INTERNAL_DOCUMENTS.includes(source);
 
 // Die Identität eines Chunks: Dokument plus Position. JSON hält die beiden Teile auseinander, was
 // auch immer der Dateiname enthält. Fortsetzen und Suche gehen beide nach diesem Schlüssel, nie
@@ -70,13 +80,28 @@ export function writeIndex<T>(strategy: Strategy, entries: IndexEntry<T>[]): str
 }
 
 export function readIndex(strategy: Strategy): z.infer<typeof indexEntrySchema>[] {
-  const file = indexFileFor(strategy);
-  const command = indexCommands[strategy];
-  const index = JSON.parse(readFileSync(file, 'utf8'));
-  if (!index || index.format_version !== INDEX_FORMAT_VERSION || !z.array(indexEntrySchema).safeParse(index.entries).success) {
-    throw new Error(`The index ${file} is invalid or outdated. Regenerate the chunks with npm run l04:0, then regenerate the index with npm run ${command}.`);
+  try {
+    const file = indexFileFor(strategy);
+    const command = indexCommands[strategy];
+    const index = JSON.parse(readFileSync(file, 'utf8'));
+    const schema = strategy === 'questions' ? z.array(questionEntrySchema) : z.array(indexEntrySchema);
+    const parsed = schema.safeParse(index?.entries);
+    if (index?.format_version !== INDEX_FORMAT_VERSION || !parsed.success) {
+      throw new Error(`The index ${file} is invalid or outdated. Regenerate the chunks with npm run l04:0, then regenerate the index with npm run ${command}.`);
+    }
+    return requireEntries(parsed.data, `The index ${file} is empty. Generate it again.`);
+  } catch (cause) {
+    throw indexLoadError(strategy, cause);
   }
-  return requireEntries(index.entries, `The index ${file} is empty. Generate it again.`);
+}
+
+// Die Fehlermeldung, wenn eine der Lektionen 05 bis 07 einen Index nicht laden kann: Sie nennt die Datei und
+// die npm-Skripte, die sie erzeugen. `cause` ist der ursprüngliche Fehler.
+export function indexLoadError(strategy: Strategy, cause: unknown): Error {
+  return new Error(
+    `Cannot load index ${indexFileFor(strategy)} (${strategy}). ` +
+    `Generate it with npm run l04:0, then npm run ${indexCommands[strategy]}.`, { cause },
+  );
 }
 
 // Die eigentliche Suche: Kosinus-Ähnlichkeit zwischen Fragevektor und jedem Eintrag, absteigend
