@@ -18,9 +18,10 @@
 // nimmt es eine bewusst vorsichtige Zeichenschätzung (`character-estimate`). Welche Methode gilt,
 // steht als `counting_method` in `manifest.json`; dort steht je Chunk auch `token_count`.
 //
-// Das Programm listet die Chunks der Beispieldokumente (siehe `ALL_DOCUMENTS` in chunking.ts), bettet alle Chunks ein, schreibt Text, Metadaten
-// und Vektor in die Indexdatei und durchsucht sie dann: Frage einbetten, mit jedem Chunk
-// vergleichen, die besten drei (`DEFAULT_TOP_K`) anzeigen. Teil 2 schneidet selbst.
+// Das Programm listet die Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true` in chunking.ts
+// die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein, schreibt Text, Metadaten und Vektor
+// in die Indexdatei und durchsucht sie dann: Frage einbetten, mit jedem Chunk vergleichen, die besten
+// drei (`DEFAULT_TOP_K`) anzeigen. Teil 2 schneidet selbst.
 //
 // Neu in dieser Datei sind die gemeinsamen Hilfsfunktionen aus `chunking.ts` (Einbetten, Suche,
 // Ausgabe mit `printHits`, `DEMO_QUESTION`) und die Index-Funktionen aus `shared/index.ts` (Indexdatei

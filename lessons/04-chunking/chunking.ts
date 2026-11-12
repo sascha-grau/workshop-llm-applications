@@ -33,8 +33,9 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 // Die vorbereiteten Chunks aus Teil 0: mehrere Dateien pro Dokument, benannt `<Dokument>--<Nummer>.md`.
 export const CHUNK_DIRECTORY = join(contentDirectory, 'owasp-genai-top-10', 'chunks');
 // Für welche Dokumente Teil 1 bis 3 die Detailausgabe zeigen (Chunk-Tabellen, in Teil 3 auch Abstände
-// und Schnitte): false = nur EXAMPLE_DOCUMENT, true = alle (längere Ausgabe). Rein eine Anzeige: was
-// indiziert wird, ändert der Schalter nie.
+// und Schnitte): `ALL_DOCUMENTS = false` = nur EXAMPLE_DOCUMENT, true = alle (längere Ausgabe).
+// ALL_DOCUMENTS ändert nur die Ausgabe, nie den Index; EXAMPLE_DOCUMENT wählt zusätzlich das Dokument
+// für Teil 4 bei FULL_CORPUS = false.
 export const EXAMPLE_DOCUMENT = '01-llm01-prompt-injection.md';
 export const ALL_DOCUMENTS = false;
 // Die Ausgabe der OWASP-Liste. Sie gehört zum Korpus, deshalb bekommt jeder Chunk denselben Wert.
@@ -72,7 +73,7 @@ export function readManifest(): Manifest {
 export function sourcesFor(subset: string[] = [], manifest = readManifest()): string[] {
   const sources = manifest.sources.map(({ file }) => file);
   const unknown = subset.filter((source) => !sources.includes(source));
-  if (unknown.length) throw new Error(`Unknown document in SUBSET: ${unknown.join(', ')}. Check manifest.json.`);
+  if (unknown.length) throw new Error(`Unknown document: ${unknown.join(', ')}. Check SUBSET or EXAMPLE_DOCUMENT against manifest.json.`);
   return subset.length ? subset : sources;
 }
 
