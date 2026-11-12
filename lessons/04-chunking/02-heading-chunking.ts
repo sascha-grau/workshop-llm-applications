@@ -14,8 +14,9 @@
 // Preis: Ein Abschnitt, den Teil 0 auf zwei vorbereitete Chunks verteilen musste, bleibt auch
 // hier zwei Chunks.
 //
-// Das Programm zeigt die Chunks der Beispieldokumente (`ALL_DOCUMENTS`), bettet den Korpus ein,
-// schreibt Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
+// Das Programm zeigt die Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true` in
+// chunking.ts die aller indizierten Dokumente; nur die Ausgabe), bettet den Korpus ein, schreibt Text,
+// Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
 //
 // Vergleiche die drei Treffer mit denen aus Teil 1: Ein vorbereiteter Chunk füllt das Token-Limit
 // und mischt mehrere Abschnitte, sein Vektor ist ein Mittelwert aus allen. Ein Chunk mit genau
@@ -40,7 +41,7 @@ import { checkModelServer } from '../shared/diagnostics.ts';
 import { e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
 import { writeIndex, readIndex, DEFAULT_TOP_K, sectionPath, type IndexEntry, type ChunkMetadata } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, exampleDocuments, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readChunks, sourcesFor } from './chunking.ts';
+import { requirePreparedChunks, embedTexts, exampleDocuments, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readManifest, readChunks, sourcesFor } from './chunking.ts';
 import { runMain } from '../shared/startup.ts';
 
 // Leer heißt: der ganze Korpus. Eine Liste von Dokumentnamen indexiert nur diese Dokumente
@@ -53,11 +54,12 @@ async function main() {
   // und den rohen Vektoren zurück.
   useBurpIfConfigured();
 
-  const sources = sourcesFor(SUBSET);
+  const manifest = readManifest();
+  const sources = sourcesFor(SUBSET, manifest);
 
-  for (const document of exampleDocuments()) {
+  for (const document of exampleDocuments(manifest, sources)) {
     console.log(`Chunks from ${document}:`);
-    console.table(readChunks(document).map((chunk) => ({
+    console.table(readChunks(document, manifest).map((chunk) => ({
       characters: chunk.text.length,
       section: sectionPath(chunk.headingPath),
       preview: previewChunk(chunk),
@@ -73,7 +75,7 @@ async function main() {
 
       for (const source of sources) {
         // NEU: readChunks schneidet die vorbereiteten Chunks an den Überschriften.
-        const chunks = readChunks(source);
+        const chunks = readChunks(source, manifest);
         if (chunks.length === 0) continue;
         // Das Präfix sagt dem Modell, welche Rolle ein Text spielt (siehe Lektion 03, Teil 3). Es gehört
         // zum Modell, nicht zum Dokument und ist nur Teil der Eingabe; der Index speichert den

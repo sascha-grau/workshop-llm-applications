@@ -29,8 +29,8 @@
 // Kosten: ein Modellaufruf und eine Embedding-Anfrage (`QUESTIONS_PER_CHUNK` Fragen) pro neuem Chunk. Mit
 // FULL_CORPUS = true sind das bei einem ersten Lauf für den ganzen Korpus Hunderte Aufrufe und
 // viele Minuten (Beispiellauf: 199 Chunks, 597 Vektoren, etwa 20 bis 25 Minuten auf dem
-// Workshop-Server). Standardmäßig läuft der ganze Korpus (FULL_CORPUS = true); mit false nur die Beispieldokumente. Ein vollständig indizierter
-// Korpus kostet keinen Aufruf.
+// Workshop-Server). Mit FULL_CORPUS = false läuft nur `EXAMPLE_DOCUMENT`. Ein vollständig
+// indizierter Korpus kostet keinen Aufruf.
 //
 // Voraussetzungen: LM Studio läuft mit gestartetem Server, geladenem Chat- und E5-Modell
 // (REMOTE_MODEL_*, REMOTE_EMBEDDING_MODEL_NAME); die vorbereiteten Chunks existieren
@@ -53,11 +53,11 @@ import { checkModelServer } from '../shared/diagnostics.ts';
 import { CHARACTERS_PER_TOKEN, e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
 import { indexFileFor, DEFAULT_TOP_K, chunkKey, uniqueChunks, sectionPath, type QuestionEntry } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, DEMO_QUESTION, exampleDocuments, readChunks, sourcesFor, previewChunk, metadataFor, printStats, searchTop, readQuestionIndex, hasChunk, appendQuestionChunk } from './chunking.ts';
+import { requirePreparedChunks, embedTexts, DEMO_QUESTION, EXAMPLE_DOCUMENT, readChunks, sourcesFor, previewChunk, metadataFor, printStats, searchTop, readQuestionIndex, hasChunk, appendQuestionChunk } from './chunking.ts';
 import { runMain } from '../shared/startup.ts';
 
-// false: nur die Beispieldokumente (schnell; EXAMPLE_DOCUMENT, mit ALL_DOCUMENTS = true alle). true: der ganze Korpus (Hunderte Modellaufrufe, viele
-// Minuten). Dokumente früherer Läufe bleiben im Index und werden durchsucht.
+// true: der ganze Korpus (Hunderte Modellaufrufe, viele Minuten). false: nur `EXAMPLE_DOCUMENT` aus
+// chunking.ts (schnell). Dokumente früherer Läufe bleiben im Index und werden durchsucht.
 const FULL_CORPUS = true;
 // NEU: So viele Fragen je Chunk (ein Vektor pro Frage). Das Schema unten prüft genau diese Zahl,
 // und der Prompt verlangt sie.
@@ -105,7 +105,7 @@ async function main() {
   // und dieses Schema prüft, was zurückkommt.
   const questionSchema = z.object({ questions: z.array(z.string().trim().min(1)).length(QUESTIONS_PER_CHUNK) });
 
-  const sources = FULL_CORPUS ? sourcesFor() : exampleDocuments();
+  const sources = FULL_CORPUS ? sourcesFor() : sourcesFor([EXAMPLE_DOCUMENT]);
 
   // Niemand bemerkt geänderte Einstellungen oder Dokumente; nur das Löschen der Datei ergibt einen
   // frischen Index.

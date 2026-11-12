@@ -21,7 +21,7 @@
 
 **Verifying Part 0 and help:** `npm run l04:0 -- --verify` checks the existing chunks against the source documents and the token limit without creating new ones (depending on the counting method, this costs another round of requests to the embedding endpoint). `npm run l04:0 -- --help` prints brief usage help. The `--` separates the npm options from those of the program. If `chunks/` already exists, a normal run aborts instead of overwriting anything: use `--verify` or move the folder.
 
-**Part 4 and the corpus:** By default `FULL_CORPUS = true` in `04-question-generation-chunking.ts`, so Part 4 writes questions for the whole corpus; the first run takes many minutes because the chat model writes questions for every chunk. For a quick run set `FULL_CORPUS = false`: Part 4 then covers only the example documents, i.e. `EXAMPLE_DOCUMENT` (`01-llm01-prompt-injection.md`), or all documents if `ALL_DOCUMENTS = true` in `chunking.ts`. Finished chunks stay in the index, so an interruption costs at most the chunk in progress. Lesson 07, Part 3 then also finds questions about the other documents.
+**Part 4 and the corpus:** By default `FULL_CORPUS = true` in `04-question-generation-chunking.ts`, so Part 4 writes questions for the whole corpus; the first run takes many minutes because the chat model writes questions for every chunk. Lesson 07, Part 3 then finds questions about all documents. For a quick run set `FULL_CORPUS = false`: Part 4 then covers only `EXAMPLE_DOCUMENT` (`01-llm01-prompt-injection.md`), and Lesson 07, Part 3 only finds questions about documents already in the index. Finished chunks stay in the index, so an interruption costs at most the chunk in progress.
 
 ## Chat language
 
@@ -52,7 +52,7 @@ Translated from the `Aufgabe` block at the top of each file; the file headers re
 ### Part 1 – `01-prepared-chunks.ts`
 
 1. Change `DEMO_QUESTION` in `chunking.ts` (e.g. `Was ist ein Jailbreak?` (What is a jailbreak?)). Are the hits still in the right document?
-2. Change `EXAMPLE_DOCUMENT` in `chunking.ts` to another document from the manifest. How many chunks does it have, and how many characters per token? Set `ALL_DOCUMENTS = true` in `chunking.ts` to show the detail output (chunk tables) of Parts 1 to 3 for all documents instead of just one (longer output). Reset the values afterwards; Parts 2 to 4 use it (Part 4 builds the question index with it, which Lesson 07, Part 3 reads).
+2. Change `EXAMPLE_DOCUMENT` in `chunking.ts` to another document from the manifest. How many chunks does it have, and how many characters per token? With `ALL_DOCUMENTS = true`, Parts 1 to 3 show the chunk tables of all documents (output only, the index stays the same). Reset both values afterwards (`'01-llm01-prompt-injection.md'` and `false`): Parts 2 and 3 show their example output with them, and Part 4 uses `EXAMPLE_DOCUMENT` when `FULL_CORPUS = false`.
 3. Look at the "characters per token" column: which chunks are clearly below 4? What is in them (hint: link lists)? (Only meaningful if `counting_method` in the manifest is not `character-estimate`; with `character-estimate` every value is about 1.)
 
 ### Part 2 – `02-heading-chunking.ts`

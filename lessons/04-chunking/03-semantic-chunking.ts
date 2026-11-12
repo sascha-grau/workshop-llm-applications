@@ -29,9 +29,9 @@
 // Perzentil-Schwelle, Schnitt. Der Rest ist Handwerk (Sätze zerlegen, Überschriften behandeln,
 // Index schreiben).
 //
-// Das Programm zeigt die Abstände und Chunks der Beispieldokumente (`ALL_DOCUMENTS`), bettet alle
-// Chunks ein,
-// schreibt Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
+// Das Programm zeigt die Abstände und Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true`
+// in chunking.ts die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein, schreibt Text,
+// Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
 //
 // Das Finden der Schnitte kostet eine eigene Runde Embeddings zusätzlich zu der für die fertigen
 // Chunks, aber noch immer keinen Sprachmodell-Aufruf. Das Programm gibt die Zahl der
@@ -152,45 +152,38 @@ async function main() {
 
   try {
     await logInvocation('Embedding', { model: remoteEmbeddingModel.name, documentCount: manifest.sources.length }, async () => {
-      // Die Beispieldokumente werden zuerst geschnitten und angezeigt. Das Ergebnis wird in der Schleife
-      // unten wiederverwendet, statt es zweimal zu berechnen, was alle Fenster doppelt einbetten würde.
-      const examples = new Map<string, Awaited<ReturnType<typeof splitSemantically>>>();
+      const examples = new Set(exampleDocuments(manifest));
+      const entries: IndexEntry<ChunkMetadata>[] = [];
       // Zählt jede Anfrage an den Embedding-Server, zum Vergleich mit Teil 2 am Ende.
       let embeddingCalls = 0;
-      for (const file of exampleDocuments(manifest)) {
-        const example = await splitSemantically(manifest.sources.find((document) => document.file === file)!);
-        examples.set(file, example);
-        embeddingCalls += example.embeddingCalls;
-        const formattedPercentile = (percent: number) => percentile(example.distances, percent).toFixed(3);
-        console.log(
-          `Distances in ${file}: ${example.distances.length} · min ${formattedPercentile(0)}` +
-          ` · median ${formattedPercentile(50)} · percentile 90 ${formattedPercentile(90)}` +
-          ` · percentile ${DISTANCE_PERCENTILE} ${formattedPercentile(DISTANCE_PERCENTILE)} · max ${formattedPercentile(100)}`,
-        );
-        // Hier zählen nur die Themensprünge (Abstand > Schwelle) als Schnitte. Die Zahl der Chunks enthält auch die Stücke,
-        // die an einer Überschrift beginnen.
-        console.log(
-          `Cuts: ${example.distances.filter((distance) => distance > example.threshold).length}` +
-          (example.distances.length < 4
-            ? ' semantic (too few sentences for a semantic cut)'
-            : ` semantic (distance > ${example.threshold.toFixed(3)})`) +
-          ` · ${example.chunks.length} chunks`,
-        );
-        console.log(`Chunks from ${file}:`);
-        console.table(example.chunks.map(({ chunkFile, text }, position) => ({
-          number: position + 1,
-          file: chunkFile,
-          characters: text.length,
-          preview: previewText(text),
-        })));
-      }
-
-      const entries: IndexEntry<ChunkMetadata>[] = [];
       for (const document of manifest.sources) {
-        const result = examples.get(document.file) ?? await splitSemantically(document);
+        const result = await splitSemantically(document);
         const { chunks } = result;
-        // Die Fenster-Stapel der Beispieldokumente sind oben schon mitgezählt.
-        if (!examples.has(document.file)) embeddingCalls += result.embeddingCalls;
+        embeddingCalls += result.embeddingCalls;
+        if (examples.has(document.file)) {
+          const formattedPercentile = (percent: number) => percentile(result.distances, percent).toFixed(3);
+          console.log(
+            `Distances in ${document.file}: ${result.distances.length} · min ${formattedPercentile(0)}` +
+            ` · median ${formattedPercentile(50)} · percentile 90 ${formattedPercentile(90)}` +
+            ` · percentile ${DISTANCE_PERCENTILE} ${formattedPercentile(DISTANCE_PERCENTILE)} · max ${formattedPercentile(100)}`,
+          );
+          // Hier zählen nur die Themensprünge (Abstand > Schwelle) als Schnitte. Die Zahl der Chunks enthält auch die Stücke,
+          // die an einer Überschrift beginnen.
+          console.log(
+            `Cuts: ${result.distances.filter((distance) => distance > result.threshold).length}` +
+            (result.distances.length < 4
+              ? ' semantic (too few sentences for a semantic cut)'
+              : ` semantic (distance > ${result.threshold.toFixed(3)})`) +
+            ` · ${chunks.length} chunks`,
+          );
+          console.log(`Chunks from ${document.file}:`);
+          console.table(chunks.map(({ chunkFile, text }, position) => ({
+            number: position + 1,
+            file: chunkFile,
+            characters: text.length,
+            preview: previewText(text),
+          })));
+        }
         if (chunks.length === 0) continue;
         // Die zweite Runde Embeddings: jetzt die fertigen Chunks. Das Präfix sagt dem Modell, welche
         // Rolle ein Text spielt (siehe Lektion 03, Teil 3); es ist nur Teil der Eingabe, der Index
