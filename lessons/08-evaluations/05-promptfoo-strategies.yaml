@@ -53,8 +53,8 @@
 #      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
 #      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
 #      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in den ersten drei Spalten
-#      bei etwa 0,9 (nur F-05 fehlt), `corpus:questions` findet auch F-05; die Unterschiede im MRR sind klein, mit
-#      elf Fragen gibt es keinen klaren Sieger.)
+#      bei etwa 0,9 (nur F-05 fehlt), `corpus:questions` findet auch F-05; die Unterschiede im MRR
+#      sind klein, mit elf Fragen gibt es keinen klaren Sieger.)
 #   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
 #      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
 #   3. Ändere `topK` bei einem Provider auf 3 (unter `config`) und starte erneut. Wie ändern sich
@@ -107,10 +107,11 @@ defaultTest:
         # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
         apiKeyRequired: false
         temperature: 0
-        # Zeitlimit je Urteil in Millisekunden, für beide Judge-Prüfungen. Ein denkender Judge braucht
-        # bis etwa 2200 Tokens je Urteil; bei rund 8 Tokens pro Sekunde decken 5 Minuten das mit Luft ab.
-        # Danach meldet die Zelle "The judge did not answer within 300 s".
-        timeout: 300000
+        # Zeitlimit je Urteil in Millisekunden, für beide Judge-Prüfungen. Ein denkender Judge braucht bis
+        # etwa 2200 Tokens je Urteil; bei rund 8 Tokens pro Sekunde sind das etwa 275 s plus Einlesen des
+        # Prompts, 10 Minuten lassen Luft (auf sehr langsamer Hardware weiter erhöhen). Danach zeigt die
+        # Zelle ERROR "The judge did not answer within 600 s …".
+        timeout: 600000
         # Obergrenze je Urteil, für beide Judge-Prüfungen. Ein Judge braucht keine Denkschritte;
         # `promptfoo-judge.ts` bittet per `reasoning_effort: none` darum und verbirgt sie, aber ein Server darf
         # die Bitte ignorieren. Das Limit muss dann Denken und JSON zusammen abdecken: Gemessen brauchte ein

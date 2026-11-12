@@ -42,7 +42,7 @@ export default class JudgeProvider implements ApiProvider {
     if (typeof config.apiKeyEnvar !== 'string' || !config.apiKeyEnvar.trim()) {
       throw new Error('The judge provider setting apiKeyEnvar is missing. Set it to REMOTE_MODEL_API_KEY in the YAML configuration.');
     }
-    this.timeout = config.timeout ?? 300_000;
+    this.timeout = config.timeout ?? 600_000;
     if (!Number.isInteger(this.timeout) || this.timeout <= 0 || this.timeout > 2_147_483_647) {
       throw new Error('The judge setting timeout in the YAML must be a positive integer in milliseconds, no greater than 2147483647.');
     }

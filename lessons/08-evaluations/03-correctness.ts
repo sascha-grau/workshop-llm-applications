@@ -58,10 +58,10 @@
 //      `npm run l08:2`. Was urteilt der Quellentreue-Judge? Warum braucht eine Evaluierung beide
 //      Messungen? (Erwartung: Teil 2 wertet sie als quellentreu ("yes"), Teil 3 als nicht korrekt.)
 //   4. Setze `EXPAND_SECTIONS = false`: Wie viele Maßnahmen nennt die Antwort jetzt, was urteilt der
-//      Judge, und liegt es an der Suche oder am Judge? Vergleiche mit F-01 in Teil 5 (Teil 5 erweitert
-//      nicht, entspricht also `EXPAND_SECTIONS = false`). (Erwartung: nur etwa 3 der 7 Maßnahmen, der
-//      Judge sagt zu Recht `no` – es liegt an der Suche, nicht am Judge.) Setze den Wert danach zurück
-//      auf `true`.
+//      Judge, und liegt es an der Suche oder am Judge? Vergleiche mit F-01 in der Spalte
+//      `corpus:headings` von Teil 5 (derselbe Index, ohne Unterabschnitte). Erwartung: nur etwa 3 der 7
+//      Maßnahmen, der Judge sagt zu Recht `no` – es liegt an der Suche, nicht am Judge. Setze den Wert
+//      danach zurück auf `true`.
 import type { ChatOpenAI } from '@langchain/openai';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
