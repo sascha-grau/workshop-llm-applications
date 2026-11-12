@@ -4,8 +4,9 @@
 // Kontext antworten, einen Judge fragen und sein JSON prüfen, zwei Urteile auswerten. Das steht hier,
 // damit jeder Teil nur zeigt, was ihn ausmacht: den Auftrag an den Judge und seine Gegenprobe.
 // Teil 4 (Regression) misst wie Teil 1; die Messung steht hier als `measureRetrieval`, Teil 1 behält
-// seine ausgeschriebene Lehrkopie. Teil 5 (promptfoo) nutzt `createChatModel`, `askJudgeJson` und
-// `wrapUntrusted` für die Prüfung `faithful`.
+// seine ausgeschriebene Lehrkopie. Teil 5 (promptfoo) nutzt `createChatModel` (Antworten des
+// Assistenten; über `promptfoo-judge.ts` auch den Judge von `faithful`), `askJudgeJson` und
+// `wrapUntrusted`.
 // - measureRetrieval: Trefferquote und MRR über das Fragen-Set (wie Teil 1, ohne Tabelle)
 // - createChatModel: Chat-Modell für Antwort und Judge (ohne Streaming, Temperature 0, Timeout)
 // - retrieveContext: Frage einbetten, ranken, Treffer zeigen, Kontext-Text bauen; mit `expandSections`
@@ -26,6 +27,7 @@ import { modelText, stripJsonFence } from '../shared/text.ts';
 // Antwort und Urteil kommen ohne Streaming, also erst am Ende; ein kleines lokales Modell braucht
 // für den Kontext aus mehreren Chunks seine Zeit. Danach lieber abbrechen als endlos warten.
 const MODEL_TIMEOUT_MS = 120_000;
+// Obergrenzen für `expandSections`: so viele Unterabschnitte je Treffer und insgesamt.
 const MAX_SUBSECTIONS_PER_HIT = 6;
 const MAX_ADDED_SUBSECTIONS = 12;
 
@@ -81,13 +83,13 @@ export async function measureRetrieval(
 // Ein Chat-Modell für Antwort und Judge.
 export function createChatModel({
   model = remoteModel.name, apiKey = remoteModel.apiKey, baseURL = remoteModel.baseURL,
-  maxTokens, temperature = 0, modelKwargs = {},
+  maxTokens, temperature = 0, modelKwargs = {}, timeout = MODEL_TIMEOUT_MS,
 }: {
   model?: string; apiKey?: string; baseURL?: string; maxTokens?: number; temperature?: number;
-  modelKwargs?: Record<string, unknown>;
+  modelKwargs?: Record<string, unknown>; timeout?: number;
 } = {}): ChatOpenAI {
   return new ChatOpenAI({
-    timeout: MODEL_TIMEOUT_MS,
+    timeout,
     model,
     apiKey,
     maxTokens,
@@ -164,12 +166,16 @@ export class JudgeFormatError extends Error {}
 // `JudgeFormatError`; die Meldungen zitieren die Antwort nicht.
 export async function askJudgeJson<T>(
   model: Pick<ChatOpenAI, 'invoke'>, systemPrompt: string, userContent: string, schema: z.ZodType<T>,
-  { expectedFormat, truncationHint = "Raise the server's output limit, or use a model that thinks less." }: {
-    expectedFormat?: string; truncationHint?: string;
+  { expectedFormat, truncationHint = "Raise the server's output limit, or use a model that thinks less.", timeout }: {
+    expectedFormat?: string; truncationHint?: string; timeout?: number;
   } = {},
 ): Promise<T> {
   const formatError = (message: string) => new JudgeFormatError(`${message}${expectedFormat ? ` Expected ${expectedFormat}.` : ''}`);
-  const response = await model.invoke([['system', systemPrompt], ['user', userContent]]);
+  const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
+  const response = await model.invoke([['system', systemPrompt], ['user', userContent]], { signal }).catch((error) => {
+    if (signal?.aborted) throw signal.reason;
+    throw error;
+  });
   if (response.response_metadata?.finish_reason === 'length') {
     throw formatError(`The judge response was truncated (finish_reason: length). ${truncationHint}`);
   }
@@ -218,6 +224,7 @@ export async function askJudge(model: ChatOpenAI, systemPrompt: string, userCont
   });
 }
 
+// Modelltext für die Konsole: Steuer- und Escape-Zeichen entfernt, jede Zeile mit "  | " eingerückt.
 function consoleModelText(text: string): string {
   return stripVTControlCharacters(text).replace(/\r\n?|[\u2028\u2029]/g, '\n')
     .replace(/[\p{Cc}\p{Cf}]/gu, (character) => character === '\n' ? '\n' : character === '\t' ? '    ' : '')

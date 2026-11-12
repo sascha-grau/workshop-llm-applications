@@ -21,7 +21,8 @@
 # zerlegen, jede gegen den Kontext prüfen), `correct` die Korrektheit gegen die Kernaussage.
 # Ein ERROR mit "judge format error" in einer Zelle heißt: Der Judge hat das JSON-Format nicht eingehalten.
 # Das ist etwas anderes als ein FAIL (die Antwort enthält nicht gedeckte Aussagen). Fehlt ein Index, zeigt
-# die Zelle ebenfalls [ERROR] mit "Cannot load index".
+# die Zelle ebenfalls [ERROR] mit "Cannot load index"; braucht der Judge länger als das Zeitlimit,
+# meldet sie "did not answer within … s" (erhöhe `timeout` im Judge-Block).
 #
 # Merke: Der Fragen-Index (Lektion 04, Teil 4) deckt mit `FULL_CORPUS = true` (Standard) den ganzen
 # Korpus ab; alle Fragen gehen deshalb an alle vier Provider. Hast du dort `FULL_CORPUS = false` gesetzt,
@@ -51,8 +52,8 @@
 #   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).
 #      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
 #      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
-#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in den ersten drei Spalten bei etwa 0,9
-#      (nur F-05 fehlt), `corpus:questions` findet auch F-05; die Unterschiede im MRR sind klein, mit
+#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in den ersten drei Spalten
+#      bei etwa 0,9 (nur F-05 fehlt), `corpus:questions` findet auch F-05; die Unterschiede im MRR sind klein, mit
 #      elf Fragen gibt es keinen klaren Sieger.)
 #   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
 #      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
@@ -106,11 +107,15 @@ defaultTest:
         # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
         apiKeyRequired: false
         temperature: 0
+        # Zeitlimit je Urteil in Millisekunden, für beide Judge-Prüfungen. Ein denkender Judge braucht
+        # bis etwa 2200 Tokens je Urteil; bei rund 8 Tokens pro Sekunde decken 5 Minuten das mit Luft ab.
+        # Danach meldet die Zelle "The judge did not answer within 300 s".
+        timeout: 300000
         # Obergrenze je Urteil, für beide Judge-Prüfungen. Ein Judge braucht keine Denkschritte;
         # `promptfoo-judge.ts` bittet per `reasoning_effort: none` darum und verbirgt sie, aber ein Server darf
         # die Bitte ignorieren. Das Limit muss dann Denken und JSON zusammen abdecken: Gemessen brauchte ein
-        # Urteil bis etwa 2200 Tokens, 8192 lässt Luft. Ein abgeschnittenes Urteil ergibt bei `correct` die
-        # Meldung von promptfoo, bei `faithful` ERROR "judge format error".
+        # Urteil bis etwa 2200 Tokens, 8192 lässt Luft. Ein abgeschnittenes Urteil ergibt bei `correct` ein
+        # FAIL mit "Could not extract JSON …", bei `faithful` ERROR "judge format error".
         max_tokens: 8192
   assert:
     # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die

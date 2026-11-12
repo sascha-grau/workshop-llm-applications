@@ -46,11 +46,13 @@ const SUPPORT_PROMPT =
 
 async function askWithRetry<T>(
   model: Pick<ChatOpenAI, 'invoke'>, stage: string, prompt: string, content: string, schema: z.ZodType<T>,
+  timeout?: number,
 ): Promise<T> {
   let feedback = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       return await askJudgeJson(model, prompt, content + feedback, schema, {
+        timeout,
         truncationHint: "Raise max_tokens in the judge block of the YAML (Part 5) or the server's output limit, or use a model that thinks less.",
       });
     } catch (error) {
@@ -66,11 +68,12 @@ async function askWithRetry<T>(
 
 export async function evaluateFaithfulness(
   model: Pick<ChatOpenAI, 'invoke'>, answer: string, context: string, threshold = 1,
+  timeout?: number,
 ): Promise<GradingResult> {
   if (!context.trim()) throw new Error('Faithfulness requires nonempty retrieved context.');
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) throw new Error('Faithfulness threshold must be between 0 and 1.');
   const { statements } = await askWithRetry(
-    model, 'statement extraction', EXTRACT_PROMPT, wrapUntrusted('answer_under_test', answer), statementsSchema,
+    model, 'statement extraction', EXTRACT_PROMPT, wrapUntrusted('answer_under_test', answer), statementsSchema, timeout,
   );
   if (statements.length === 0) {
     return {
@@ -95,7 +98,7 @@ export async function evaluateFaithfulness(
     `${wrapUntrusted('retrieved_context', context)}\n\n${wrapUntrusted('statements', JSON.stringify(
       statements.map((text, index) => ({ statement: index + 1, text })),
     ))}`,
-    verdictsSchema,
+    verdictsSchema, timeout,
   );
   const ordered = verdicts.toSorted((a, b) => a.statement - b.statement);
   const supported = ordered.filter((verdict) => verdict.supported).length;
@@ -131,6 +134,11 @@ export default async function faithfulness(output: string, context: AssertionVal
   if (!judge) {
     throw new Error('Faithfulness requires test.options.provider with the promptfoo-judge.ts configuration from the YAML judge block.');
   }
-  return evaluateFaithfulness(judge.createJudgeModel(), output, retrieved, threshold);
+  try {
+    return await evaluateFaithfulness(judge.createJudgeModel(), output, retrieved, threshold, judge.timeout);
+  } catch (error) {
+    judge.throwIfTimedOut(error);
+    throw error;
+  }
 }
 

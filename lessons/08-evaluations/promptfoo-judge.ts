@@ -3,8 +3,9 @@
 // Der Provider verpackt `openai:chat:<Modell>` (das Modell steht in `config.model` der YAML-Datei) und dient
 // in Teil 5 beiden Judge-Prüfungen, `correct` und `faithful`, in Teil 6 der Prüfung `correct`. Für
 // `faithful` baut er außerdem das LangChain-Modell aus denselben Einstellungen des YAML-Blocks (Modell,
-// Adresse, Schlüssel-Variable, `max_tokens`, `temperature`). Er setzt zwei Dinge selbst, abhängig von
-// `SHOW_THINKING` aus `.env` (siehe `settings.showThinking`):
+// Adresse, Schlüssel-Variable, `max_tokens`, `temperature`). Das `timeout` des Blocks gilt für beide
+// Prüfungen. Er setzt zwei Dinge selbst, abhängig von `SHOW_THINKING` aus `.env` (siehe
+// `settings.showThinking`):
 // - `showThinking`: promptfoo setzt `{{ env.X }}` als TEXT ein, und sein OpenAI-Adapter liest
 //   `config.showThinking ?? true`. Der Text "false" wäre also wahr. Hier steht ein echter Boolean. Bleibt das
 //   Denken sichtbar, stellt promptfoo es als "Thinking: …" vor jede Ausgabe von `llm-rubric` (`correct`) und
@@ -17,12 +18,13 @@
 // Fehlen Modell, Adresse oder der Name der Schlüssel-Variable, bricht der Provider mit einer Meldung ab.
 // Zum Verstehen der Lektion nicht nötig.
 
-import { loadApiProvider } from 'promptfoo';
+import { loadApiProvider, loadApiProviders } from 'promptfoo';
 import type { ApiProvider, ProviderOptions, ProviderResponse } from 'promptfoo';
 import { settings } from '../shared/config.ts';
 import { createChatModel } from './evaluation.ts';
 
 export default class JudgeProvider implements ApiProvider {
+  readonly timeout: number;
   private readonly options: ProviderOptions;
   private readonly model: string;
   private provider: Promise<ApiProvider> | undefined;
@@ -40,6 +42,10 @@ export default class JudgeProvider implements ApiProvider {
     if (typeof config.apiKeyEnvar !== 'string' || !config.apiKeyEnvar.trim()) {
       throw new Error('The judge provider setting apiKeyEnvar is missing. Set it to REMOTE_MODEL_API_KEY in the YAML configuration.');
     }
+    this.timeout = config.timeout ?? 300_000;
+    if (!Number.isInteger(this.timeout) || this.timeout <= 0 || this.timeout > 2_147_483_647) {
+      throw new Error('The judge setting timeout in the YAML must be a positive integer in milliseconds, no greater than 2147483647.');
+    }
     this.model = config.model.trim();
   }
 
@@ -50,6 +56,7 @@ export default class JudgeProvider implements ApiProvider {
   private buildConfig() {
     const config = { ...this.options.config };
     delete config.model;
+    delete config.timeout;
     config.showThinking = settings.showThinking;
     config.passthrough = { ...config.passthrough };
     if (!config.showThinking && config.passthrough.reasoning_effort === undefined) {
@@ -61,10 +68,26 @@ export default class JudgeProvider implements ApiProvider {
 
   private getProvider(): Promise<ApiProvider> {
     if (!this.provider) {
-      const config = this.buildConfig();
-      this.provider = loadApiProvider(this.id(), { options: { config }, env: this.options.env });
+      this.provider = this.loadProvider();
     }
     return this.provider;
+  }
+
+  private async loadProvider(): Promise<ApiProvider> {
+    const config = this.buildConfig();
+    const env = { ...this.options.env, REQUEST_TIMEOUT_MS: String(this.timeout) };
+    const provider = await loadApiProvider(this.id(), { options: { config }, env });
+    const [scopedProvider] = await loadApiProviders(provider.callApi.bind(provider), { env });
+    return scopedProvider;
+  }
+
+  throwIfTimedOut(error: unknown): void {
+    const name = error instanceof Error ? error.name : '';
+    const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+    if (name === 'TimeoutError' || name === 'APIConnectionTimeoutError'
+      || /^(?:API call error: (?:Error: )?)?Request timed out(?: after \d+ ms)?\.?$/.test(message)) {
+      throw new Error(`The judge did not answer within ${this.timeout / 1000} s (timeout in the judge block of the YAML).`);
+    }
   }
 
   createJudgeModel(): ReturnType<typeof createChatModel> {
@@ -81,6 +104,7 @@ export default class JudgeProvider implements ApiProvider {
         maxTokens: config.max_tokens,
         temperature: config.temperature,
         modelKwargs: config.passthrough,
+        timeout: this.timeout,
       });
     }
     return this.chatModel;
@@ -88,6 +112,20 @@ export default class JudgeProvider implements ApiProvider {
 
   async callApi(...args: Parameters<ApiProvider['callApi']>): Promise<ProviderResponse> {
     const provider = await this.getProvider();
-    return provider.callApi(...args);
+    const deadline = AbortSignal.timeout(this.timeout);
+    const callerSignal = args[2]?.abortSignal;
+    const abortSignal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
+    try {
+      const response = await provider.callApi(args[0], args[1], { ...args[2], abortSignal });
+      if (deadline.aborted && !callerSignal?.aborted) this.throwIfTimedOut(deadline.reason);
+      this.throwIfTimedOut(response.error);
+      return response;
+    } catch (error) {
+      if (!callerSignal?.aborted) {
+        if (deadline.aborted) this.throwIfTimedOut(deadline.reason);
+        this.throwIfTimedOut(error);
+      }
+      throw error;
+    }
   }
 }

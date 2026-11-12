@@ -73,6 +73,8 @@ defaultTest:
         apiKeyEnvar: REMOTE_MODEL_API_KEY
         apiKeyRequired: false
         temperature: 0
+        # Zeitlimit je Urteil in Millisekunden (Begründung in Teil 5).
+        timeout: 300000
         # Obergrenze je Urteil; sie muss Denken und JSON abdecken (Begründung in Teil 5).
         max_tokens: 8192
   assert:

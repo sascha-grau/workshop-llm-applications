@@ -48,9 +48,8 @@
 // Aufgabe:
 //   1. Lies Kernaussage, Antwort und beide Urteile. Welche Punkte der Kernaussage nennt die
 //      Antwort, welche fehlen? Lehnt der Judge `HONEST_NO` ab (`correct: no`)? (Erwartung:
-//      `yes` für die echte Antwort, `no` für `HONEST_NO`, am Ende `Judge check passed`. Ohne die
-//      Erweiterung der Abschnitte enthielten die fünf Treffer nur 3 der 7 Maßnahmen von F-01; die Antwort
-//      war dann wirklich unvollständig, und der Judge sagte zu Recht `no`. Lies beide Begründungen.)
+//      `yes` für die echte Antwort, `no` für `HONEST_NO`, am Ende `Judge check passed`; die Spalte
+//      `via` zeigt Treffer und Unterabschnitte. Lies beide Begründungen.)
 //   2. Setze `QUESTION_ID` auf eine Frage, bei der Teil 1 (`npm run l08:1`) Rang 0 zeigt, also
 //      kein erwartetes Dokument in den Top-k findet. Was urteilt der Judge jetzt über die echte
 //      Antwort, und woran liegt der Fehler: an der Suche oder am Modell? (Zeigt keine Frage Rang 0,
@@ -59,7 +58,10 @@
 //      `npm run l08:2`. Was urteilt der Quellentreue-Judge? Warum braucht eine Evaluierung beide
 //      Messungen? (Erwartung: Teil 2 wertet sie als quellentreu ("yes"), Teil 3 als nicht korrekt.)
 //   4. Setze `EXPAND_SECTIONS = false`: Wie viele Maßnahmen nennt die Antwort jetzt, was urteilt der
-//      Judge, und liegt es an der Suche oder am Judge? Vergleiche mit F-01 in Teil 5.
+//      Judge, und liegt es an der Suche oder am Judge? Vergleiche mit F-01 in Teil 5 (Teil 5 erweitert
+//      nicht, entspricht also `EXPAND_SECTIONS = false`). (Erwartung: nur etwa 3 der 7 Maßnahmen, der
+//      Judge sagt zu Recht `no` – es liegt an der Suche, nicht am Judge.) Setze den Wert danach zurück
+//      auf `true`.
 import type { ChatOpenAI } from '@langchain/openai';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
@@ -72,7 +74,7 @@ import { runMain } from '../shared/startup.ts';
 // Frage wie in Teil 2; der Kontext ist hier größer (Unterabschnitte).
 const QUESTION_ID = 'F-01';
 // Wie viele Treffer die Suche liefert, wie in Teil 2. Dazu kommen ihre Unterabschnitte
-// (siehe `expandSections`).
+// (siehe `EXPAND_SECTIONS`).
 const TOP_K = 5;
 // Ob zu den Treffern ihre Unterabschnitte kommen (siehe Schritt 2); `false` zeigt, was dann fehlt.
 const EXPAND_SECTIONS = true;
@@ -114,8 +116,8 @@ async function main() {
   await checkModelServer({ viaBurp: true });
 
   try {
-    // Schritt 2 und 3: Suchen (mit den Unterabschnitten der Treffer, sonst fehlen Teile der Aufzählung
-    // in F-01) und antworten, wie in Teil 2.
+    // Schritt 2 und 3: Suchen (mit `EXPAND_SECTIONS` auch die Unterabschnitte der Treffer, sonst fehlen
+    // Teile der Aufzählung in F-01) und antworten, wie in Teil 2.
     const context = await retrieveContext(index, testQuestion.question, TOP_K, { expandSections: EXPAND_SECTIONS });
     const answer = await answerFromContext(model, context, testQuestion.question);
 

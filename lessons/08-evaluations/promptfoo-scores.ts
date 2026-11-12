@@ -2,10 +2,10 @@
 // eigener Teil.
 //
 // `scoreCell` rechnet das Ergebnis einer Zelle aus den Einzelprüfungen wie promptfoo selbst: bestanden,
-// wenn alle bestehen (hat der Testfall eine `threshold`, wenn die Wertung sie erreicht), die Wertung ist der
-// gewichtete Mittelwert. Neu ist nur, dass die Funktion die Begründung jeder Prüfung (z. B. die Liste der
-// Aussagen aus `promptfoo-faithfulness.ts`) in die Zelle schreibt, damit der statische HTML-Bericht sie
-// zeigt. Sie versteht nur flache Prüfungen: `assert-set` und `guardrails` lehnt sie mit einer Meldung ab,
+// wenn alle bestehen (oder, hat der Testfall eine `threshold`, wenn die Wertung sie erreicht), die
+// Wertung ist der gewichtete Mittelwert. Neu ist nur, dass die Funktion die Begründung jeder Prüfung
+// (z. B. die Liste der Aussagen aus `promptfoo-faithfulness.ts`) in die Zelle schreibt, damit der
+// statische HTML-Bericht sie zeigt. Sie versteht nur flache Prüfungen: `assert-set` und `guardrails` lehnt sie mit einer Meldung ab,
 // weil promptfoo ihr nur die abgeflachten Ergebnisse gibt. Zum Verstehen der Lektion nicht nötig.
 
 import type { GradingResult } from 'promptfoo';
