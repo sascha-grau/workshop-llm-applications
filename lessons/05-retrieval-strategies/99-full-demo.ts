@@ -23,6 +23,8 @@
 // Antwort auf (`withoutSource`). Den Wert gibt es nur für dieses Modell und diesen Korpus; ändert
 // sich eins davon, miss neu. Liegt die Frage ohne Antwort nur knapp unter den anderen, ist die
 // Schwelle eine Wette: Eine neue, etwas andere Frage kann auf der falschen Seite landen.
+// Die Kalibrierung fragt nur, ob der beste Treffer die Schwelle erreicht. Ob das richtige Dokument
+// unter den Top-k steht, misst Lektion 08, Teil 1 am selben Fragen-Set (Trefferquote und MRR).
 //
 // Voraussetzungen: LM Studio läuft mit gestartetem Server und geladenem E5-Modell; der Index aus
 // Lektion 04, Teil 2 muss existieren (erst `npm run l04:0`, dann `npm run l04:2`). Ein Chat-Modell
@@ -37,8 +39,6 @@
 //      in den erwarteten ("best elsewhere" größer als "best expected")?
 //   3. Ergänze in `question-set.json` eine eigene Frage mit ihren erwarteten Dokumenten und passe
 //      `THRESHOLD` so an, dass alle Fragen mit Antwort durchkommen und `withoutSource` nicht.
-import { readFileSync } from 'node:fs';
-import { z } from 'zod';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
@@ -46,7 +46,7 @@ import { assertVectorCount, cosineSimilarity, e5Model, embeddingQuery } from '..
 import { logInvocation } from '../shared/logging.ts';
 import { embeddings, indexFileFor, rankEntries, sectionPath, uniqueChunks, type ChunkMetadata, type IndexEntry } from '../shared/index.ts';
 import { splitIntoChildren } from '../04-chunking/chunking.ts';
-import { loadIndex, INDEX_STRATEGY, selectByMmr } from './retrieval.ts';
+import { loadIndex, loadQuestionSet, INDEX_STRATEGY, QUESTION_SET_FILE, selectByMmr } from './retrieval.ts';
 import { runMain } from '../shared/startup.ts';
 
 // Die Frage, auf die alle Strategien angewendet werden.
@@ -66,8 +66,6 @@ const FILTER: Partial<Pick<ChunkMetadata, 'accessGroup' | 'version'>> = { access
 const THRESHOLD = 0.83;
 // Parent-Document (Lektion 04, Teil 5): die Größe eines Kindes in Zeichen, ohne Überschriftenpfad.
 const CHILD_SIZE = 300;
-// Das Fragen-Set für die Kalibrierung, neben dieser Datei.
-const QUESTION_SET_FILE = new URL('question-set.json', import.meta.url);
 
 async function main() {
   // Burp (Lektion 01, Teil 3) bleibt aktiv, falls gesetzt: Die Anfragen zeigen die gesendeten Texte
@@ -75,7 +73,8 @@ async function main() {
   useBurpIfConfigured();
 
   // Schritt 1: Index laden, vollständig mit internen Chunks (`loadIndex` in retrieval.ts), damit
-  // der Filter in Schritt 4c etwas zu tun hat.
+  // der Filter in Schritt 4c etwas zu tun hat. Das Fragen-Set für Schritt 5 lädt und prüft
+  // `loadQuestionSet` (retrieval.ts).
   const index = loadIndex();
   const questionSet = loadQuestionSet();
   console.log(`Index: ${index.length} chunks from ${indexFileFor(INDEX_STRATEGY)}`);
@@ -113,7 +112,7 @@ async function main() {
         ` / average ${average.toFixed(3)} / max ${Math.max(...similarities).toFixed(3)}`,
       );
 
-      // Die MMR-Auswahlaus Teil 2: In jeder Runde gewinnt der Kandidat mit dem höchsten Wert
+      // Die MMR-Auswahl aus Teil 2: In jeder Runde gewinnt der Kandidat mit dem höchsten Wert
       // LAMBDA × Ähnlichkeit zur Frage − (1 − LAMBDA) × höchste Ähnlichkeit zu einem gewählten Chunk.
       // Schritt 4b: MMR über die besten `FETCH_K` Kandidaten.
       printHits(`2. MMR with lambda ${LAMBDA} from the top ${FETCH_K}:`, selectByMmr(rankEntries(index, queryVector, FETCH_K), TOP_K, LAMBDA));
@@ -174,21 +173,6 @@ function printHits(title: string, hits: (IndexEntry & { similarity: number })[])
     section: sectionPath(metadata.headingPath),
     characters: text.length,
   })));
-}
-
-// Das Fragen-Set ist Eingabe von außen (von Hand bearbeitet), deshalb prüft ein Schema seine Form.
-const questionSchema = z.object({
-  id: z.string(), question: z.string().trim().min(1), expectedSources: z.array(z.string()),
-  keyPoint: z.string(), tags: z.array(z.string()),
-});
-const questionSetSchema = z.object({ questions: z.array(questionSchema).min(1), withoutSource: questionSchema });
-
-function loadQuestionSet(): z.infer<typeof questionSetSchema> {
-  try {
-    return questionSetSchema.parse(JSON.parse(readFileSync(QUESTION_SET_FILE, 'utf8')));
-  } catch (cause) {
-    throw new Error(`Cannot load the question set ${QUESTION_SET_FILE.pathname}. Check its JSON and fields.`, { cause });
-  }
 }
 
 // Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.

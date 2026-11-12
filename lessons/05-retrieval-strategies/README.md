@@ -10,9 +10,9 @@
 | 2 | `02-mmr.ts` | `npm run l05:2` | MMR: weigh relevance against diversity | like Part 1 |
 | 3 | `03-metadata-filter.ts` | `npm run l05:3` | Metadata filter: before or after the search, access rights | like Part 1 |
 | 4 | `04-score-threshold.ts` | `npm run l05:4` | Score threshold: cut off by minimum similarity | like Part 1 |
-| 5 | `05-full-demo.ts` | `npm run l05:5` | All strategies side by side (including parent-document from Lesson 04, Part 5), and the threshold calibrated on `question-set.json` | like Part 1 |
+| 5 | `99-full-demo.ts` | `npm run l05:5` | All strategies side by side (including parent-document from Lesson 04, Part 5), and the threshold calibrated on `question-set.json` | like Part 1 |
 
-`retrieval.ts` is the helper module shared by the parts (loading the index, and the MMR selection that Part 5 uses; Part 2 keeps an identical copy in its own file so you can read it there), not a part of its own. Ranking and index files live in [`shared/index.ts`](../shared/index.ts).
+`retrieval.ts` is the helper module shared by the parts (loading the index and the question set, and the MMR selection that Part 5 uses; Part 2 keeps an identical copy in its own file so you can read it there), not a part of its own. Ranking and index files live in [`shared/index.ts`](../shared/index.ts).
 
 **Order:** First create the chunks (`npm run l04:0`) and the heading index (`npm run l04:2`); all five parts search this one index. Work through the parts from 1 to 5: Parts 2 to 5 assume top-k from Part 1. Each part runs once, writes its tables to the terminal and exits; there is no chat. You only need the E5 model in LM Studio, no chat model and no Open WebUI. Burp is optional.
 
@@ -33,7 +33,7 @@
 - **Pre-filter / post-filter:** filter before the search (top-k then searches only the allowed rest) or after it (hits are then missing, and the blocked text was already part of the result). For access rights, always before (Part 3).
 - **Access group:** `public` or `internal`, in every chunk's metadata since Lesson 04. The appendix counts as `internal` and stands in for a document that not everyone may read.
 - **Score threshold:** only chunks with a minimum similarity remain. The number of hits is open, zero included. The right value depends on the embedding model and has to be measured (Part 4).
-- **Calibration / question set:** measuring the threshold instead of guessing it. `question-set.json` holds questions the corpus answers (each with its expected documents) and one question without an answer (`withoutSource`). A good threshold lets all answerable questions through and stops the one without an answer; it is valid only for this model and this corpus (Part 5).
+- **Calibration / question set:** measuring the threshold instead of guessing it. `question-set.json` holds questions the corpus answers (each with its expected documents) and one question without an answer (`withoutSource`). A good threshold lets all answerable questions through and stops the one without an answer; it is valid only for this model and this corpus (Part 5). [Lesson 08](../08-evaluations/README.md), Part 1 measures the search itself on the same question set (hit ratio and MRR).
 
 ## Tasks
 
@@ -64,7 +64,7 @@ Translated from the `Aufgabe` block at the top of each file; the file headers re
 2. Add a question of your own to `QUESTIONS` that the documents answer (e.g. `Welche Risiken entstehen durch zu viele Berechtigungen?`). Does the threshold from task 1 let the fitting hits through here too?
 3. Add a question that sounds like security but is not in the documents (e.g. `Wie sichere ich mein WLAN zu Hause ab?` (How do I secure my Wi-Fi at home?)). Can you find a threshold that separates it from all answerable questions?
 
-### Part 5 – `05-full-demo.ts`
+### Part 5 – `99-full-demo.ts`
 
 1. Compare the five tables: which strategy returns chunks from other sections than top-k, and which one delivers the most context?
 2. Read the calibration: which questions do not reach `THRESHOLD` although the answer is in the corpus? For which is the best similarity in another document higher than in the expected ones (`best elsewhere` larger than `best expected`)?

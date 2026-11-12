@@ -10,9 +10,9 @@
 | 2 | `02-mmr.ts` | `npm run l05:2` | MMR: Relevanz gegen Vielfalt abwägen | wie Teil 1 |
 | 3 | `03-metadata-filter.ts` | `npm run l05:3` | Metadaten-Filter: vor oder nach der Suche, Zugriffsrechte | wie Teil 1 |
 | 4 | `04-score-threshold.ts` | `npm run l05:4` | Schwellenwert: nach Mindest-Ähnlichkeit abschneiden | wie Teil 1 |
-| 5 | `05-full-demo.ts` | `npm run l05:5` | Alle Strategien nebeneinander (auch Parent-Document aus Lektion 04, Teil 5) und der Schwellenwert, kalibriert an `question-set.json` | wie Teil 1 |
+| 5 | `99-full-demo.ts` | `npm run l05:5` | Alle Strategien nebeneinander (auch Parent-Document aus Lektion 04, Teil 5) und der Schwellenwert, kalibriert an `question-set.json` | wie Teil 1 |
 
-`retrieval.ts` ist das gemeinsame Hilfsmodul der Teile (Index laden und die MMR-Auswahl, die Teil 5 nutzt; Teil 2 behält eine identische Kopie in seiner eigenen Datei, damit du sie dort lesen kannst), kein eigener Teil. Ranking und Indexdateien liegen in [`shared/index.ts`](../shared/index.ts).
+`retrieval.ts` ist das gemeinsame Hilfsmodul der Teile (Index und Fragen-Set laden und die MMR-Auswahl, die Teil 5 nutzt; Teil 2 behält eine identische Kopie in seiner eigenen Datei, damit du sie dort lesen kannst), kein eigener Teil. Ranking und Indexdateien liegen in [`shared/index.ts`](../shared/index.ts).
 
 **Reihenfolge:** Erzeuge vorher die Chunks (`npm run l04:0`) und den Überschriften-Index (`npm run l04:2`); alle fünf Teile durchsuchen diesen einen Index. Geh die Teile von 1 bis 5 durch: Teil 2 bis 5 setzen Top-k aus Teil 1 voraus. Jeder Teil läuft einmal durch, schreibt seine Tabellen ins Terminal und endet; es gibt keinen Chat. Du brauchst nur das E5-Modell in LM Studio, kein Chat-Modell und kein Open WebUI. Burp ist optional.
 
@@ -33,7 +33,7 @@
 - **Pre-Filter / Post-Filter:** vor der Suche filtern (dann sucht Top-k nur im erlaubten Rest) oder danach (dann fehlen Treffer, und der gesperrte Text war schon Teil des Ergebnisses). Für Zugriffsrechte immer vorher (Teil 3).
 - **Zugriffsgruppe:** `public` oder `internal`, in den Metadaten jedes Chunks seit Lektion 04. Der Anhang gilt als `internal` und steht stellvertretend für ein Dokument, das nicht jeder lesen darf.
 - **Schwellenwert (Score Threshold):** nur Chunks mit einer Mindest-Ähnlichkeit bleiben. Die Zahl der Treffer ist offen, auch null ist möglich. Der passende Wert hängt vom Embedding-Modell ab und muss ausgemessen werden (Teil 4).
-- **Kalibrierung / Fragen-Set:** den Schwellenwert ausmessen, statt ihn zu raten. `question-set.json` enthält Fragen, die der Korpus beantwortet (je mit ihren erwarteten Dokumenten), und eine Frage ohne Antwort (`withoutSource`). Ein guter Schwellenwert lässt alle beantwortbaren Fragen durch und hält die ohne Antwort auf; er gilt nur für dieses Modell und diesen Korpus (Teil 5).
+- **Kalibrierung / Fragen-Set:** den Schwellenwert ausmessen, statt ihn zu raten. `question-set.json` enthält Fragen, die der Korpus beantwortet (je mit ihren erwarteten Dokumenten), und eine Frage ohne Antwort (`withoutSource`). Ein guter Schwellenwert lässt alle beantwortbaren Fragen durch und hält die ohne Antwort auf; er gilt nur für dieses Modell und diesen Korpus (Teil 5). [Lektion 08](../08-evaluations/README.de.md), Teil 1 misst am selben Fragen-Set die Suche selbst (Trefferquote und MRR).
 
 ## Aufgaben
 
@@ -64,7 +64,7 @@ Die Aufgaben stehen auch am Anfang jeder Datei; maßgeblich sind die Dateiköpfe
 2. Ergänze in `QUESTIONS` eine eigene Frage, die die Dokumente beantworten (z. B. "Welche Risiken entstehen durch zu viele Berechtigungen?"). Lässt der Schwellenwert aus Aufgabe 1 auch hier die passenden Treffer durch?
 3. Ergänze eine Frage, die nach Sicherheit klingt, aber nicht in den Dokumenten steht (z. B. "Wie sichere ich mein WLAN zu Hause ab?"). Findest du einen Schwellenwert, der sie von allen beantwortbaren Fragen trennt?
 
-### Teil 5 – `05-full-demo.ts`
+### Teil 5 – `99-full-demo.ts`
 
 1. Vergleiche die fünf Tabellen: Welche Strategie liefert Chunks aus anderen Abschnitten als Top-k, und welche liefert den meisten Kontext?
 2. Lies die Kalibrierung: Welche Fragen erreichen `THRESHOLD` nicht, obwohl die Antwort im Korpus steht? Bei welchen liegt die beste Ähnlichkeit in einem anderen Dokument höher als in den erwarteten (`best elsewhere` größer als `best expected`)?
