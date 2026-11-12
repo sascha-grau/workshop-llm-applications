@@ -5,11 +5,11 @@
  * Der Stream ist NDJSON: ein JSON-Objekt pro Zeile, jedes mit einem Stück der Antwort, am Ende
  * eine Zeile mit `done: true`. Die Lektionen nutzen diese Funktion statt `asStream` der Fassade. Das
  * verwirft Stücke, die nur aus Leerraum bestehen (z. B. "\n\n"), und würde so die Absätze einer
- * Antwort zusammenschieben. `source` ist ein fertiger Text (wird in einem Stück gesendet) oder
- * ein Modell-Stream (wird Stück für Stück gesendet). Mit `options.footer` hängt die Funktion nach der
+ * Antwort zusammenschieben. `source` ist ein fertiger Text oder eine fertige Modell-Antwort (beide
+ * werden in einem Stück gesendet) oder ein Modell-Stream (wird Stück für Stück gesendet). Mit `options.footer` hängt die Funktion nach der
  * Antwort noch einen festen Text an (die Quellenliste der Lektionen 02 und 07). Denkschritte von
  * Reasoning-Modellen entfernt sie vorher, in beiden Fällen (`withoutThinking`). Mit SHOW_THINKING=true bleiben
- * sie stattdessen als `<think>`-Block stehen. `printModelStream` schreibt einen Modell-Stream auf die Konsole.
+ * sie stattdessen als `<think>`-Block stehen.
  */
 import type { Response } from 'express';
 import type { ChatHandler } from 'ollama-api-facade-js';
@@ -21,11 +21,12 @@ import { settings } from './config.ts';
 const THINK_OPEN = '<think>';
 const THINK_CLOSE = '</think>';
 
-// Entfernt Denkschritte (`<think>…</think>`, siehe `stripThinking` in text.ts) aus einem Modell-Stream, ohne
-// das Streaming aufzugeben. Das Feld `reasoning` der Rohantwort (siehe `modelReasoning`) wird mit SHOW_THINKING=true
-// als `<think>…</think>` in den Stream gesetzt, sonst ignoriert. Die Schwierigkeit: Ein Tag kann über zwei Stücke verteilt ankommen ("<thi" und
-// "nk>"). Deshalb hält die Funktion das Ende eines Stücks zurück, solange es der Anfang eines Tags sein
-// könnte, und gibt es erst mit dem nächsten Stück weiter. Innerhalb eines Blocks wird nichts ausgegeben.
+// Entfernt Denkschritte (`<think>…</think>`, siehe `stripThinking` in text.ts) aus einem Modell-Stream,
+// ohne das Streaming aufzugeben. Das Feld `reasoning` der Rohantwort (siehe `modelReasoning`) wird mit
+// SHOW_THINKING=true als `<think>…</think>` in den Stream gesetzt, sonst ignoriert. Die Schwierigkeit: Ein
+// Tag kann über zwei Stücke verteilt ankommen ("<thi" und "nk>"). Deshalb hält die Funktion das Ende
+// eines Stücks zurück, solange es der Anfang eines Tags sein könnte, und gibt es erst mit dem nächsten
+// Stück weiter. Innerhalb eines Blocks wird nichts ausgegeben.
 // Leerraum vor dem ersten sichtbaren Text fällt weg: Modelle schreiben nach `</think>` meist "\n\n".
 // Grenze: Setzt die Chat-Vorlage `<think>` schon in den Prompt, kommt nur `</think>` an. Was davor stand, ist dann
 // bereits gesendet: Ein Stream kann nicht zurücknehmen. `stripThinking` (fertiger Text) erkennt diesen Fall.
@@ -79,12 +80,6 @@ export async function* withoutThinking(chunks: AsyncIterable<ModelOutput>): Asyn
   // Am Ende: Ein zurückgehaltener Rest außerhalb eines Blocks war doch kein Tag; ein offener Block fällt weg.
   const rest = thinking ? '' : emit(pending);
   if (rest) yield { text: rest };
-}
-
-// Schreibt einen Modell-Stream auf die Konsole (Lektion 01 und 02), mit `withoutThinking`.
-export async function printModelStream(chunks: AsyncIterable<ModelOutput>): Promise<void> {
-  for await (const chunk of withoutThinking(chunks)) process.stdout.write(chunk.text);
-  process.stdout.write('\n');
 }
 
 // Wie viele Zeichen am Ende von `text` der Anfang von `tag` sein könnten (z. B. "<thi" für "<think>").
@@ -174,8 +169,9 @@ export async function sendChatStream(
       }
     }
   }
-  // Denkschritte erreichen Open WebUI weder im fertigen Text noch im Stream (außer mit SHOW_THINKING=true). Einzige Lücke im Stream: ein
-  // `</think>` ohne öffnendes Tag (siehe `withoutThinking`); der fertige Text deckt auch diesen Fall ab.
+  // Denkschritte erreichen Open WebUI weder im fertigen Text noch im Stream (außer mit SHOW_THINKING=true).
+  // Einzige Lücke im Stream: ein `</think>` ohne öffnendes Tag (siehe `withoutThinking`); der fertige Text
+  // deckt auch diesen Fall ab.
   if (typeof source === 'string' || 'text' in source) {
     const answer = typeof source === 'string' ? stripThinking(source) : modelText(source);
     if (answer) await write(answer);

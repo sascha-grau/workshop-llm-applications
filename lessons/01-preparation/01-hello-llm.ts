@@ -16,11 +16,12 @@
 //   1. Ändere die Frage in `model.stream(...)` und starte neu.
 //   2. Setze beim ChatOpenAI-Objekt `temperature: 1.5` und frage mehrmals dasselbe. Was ändert sich?
 //      (`temperature` steuert, wie zufällig die Wortwahl ist; 0 = möglichst gleichbleibend.)
-//   3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `.text` aus. Wann siehst du die Antwort?
+//   3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `modelText(response)` aus (nur `.text`
+//      lässt mit SHOW_THINKING=true die Denkschritte weg). Wann siehst du die Antwort?
 import { ChatOpenAI } from '@langchain/openai';
 import { remoteModel } from '../shared/config.ts';
 import { logInvocation } from '../shared/logging.ts';
-import { printModelStream } from '../shared/stream.ts';
+import { withoutThinking } from '../shared/stream.ts';
 import { runMain } from '../shared/startup.ts';
 
 async function main() {
@@ -31,7 +32,7 @@ async function main() {
     apiKey: remoteModel.apiKey,
     // Keine automatischen Wiederholungen: Fehler sollen sofort sichtbar werden.
     maxRetries: 0,
-    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts); nur für SHOW_THINKING nötig.
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
@@ -39,7 +40,10 @@ async function main() {
   await logInvocation('Model', { model: remoteModel.name }, async () => {
     // `stream` liefert Stücke (Chunks), sobald das Modell sie erzeugt, statt auf die ganze Antwort zu warten.
     const stream = await model.stream('Erkläre in zwei Sätzen, was ein Sprachmodell ist.');
-    await printModelStream(stream);
+    for await (const chunk of withoutThinking(stream)) {
+      process.stdout.write(chunk.text);
+    }
+    process.stdout.write(String.fromCharCode(10));
   });
 }
 

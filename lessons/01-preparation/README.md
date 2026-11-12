@@ -30,7 +30,7 @@ Translated from the `Aufgabe` block at the top of each file; the file headers re
 
 1. Change the question in `model.stream(...)` and restart.
 2. Set `temperature: 1.5` on the `ChatOpenAI` object and ask the same thing several times. What changes? (`temperature` controls how random the word choice is; 0 = as repeatable as possible.)
-3. Replace `model.stream` with `await model.invoke(...)` and print `.text`. When do you see the answer?
+3. Replace `model.stream` with `await model.invoke(...)` and print `modelText(response)` (`.text` alone would leave out the thinking only with `SHOW_THINKING=true`). When do you see the answer?
 
 ### Part 2 – `02-open-webui.ts`
 

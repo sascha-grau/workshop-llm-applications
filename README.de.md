@@ -140,7 +140,7 @@ Die Einstellungen im Überblick:
 | `REMOTE_MODEL_BASE_URL` | Adresse des Servers mit `/v1`, für Chat und Embeddings (LM Studio: `http://localhost:1234/v1`). |
 | `REMOTE_MODEL_API_KEY` | Nur nötig, wenn der Server einen Schlüssel verlangt. LM Studio braucht keinen. |
 | `REMOTE_MODEL_NAME` | Identifier des Chat-Modells aus LM Studio. |
-| `SHOW_THINKING` | Optional: `true` behält die Denkschritte von Reasoning-Modellen in der Ausgabe (Konsole, Open WebUI als `<think>`-Block), statt sie wegzulassen. Leer oder `false` ist der Standard. Mit `true` scheitern JSON-Antworten in Lektion 04, 06, 07 und 08, und die Auswertung in Lektion 08 wird unzuverlässig. Erlaubt: `true`/`false`, `1`/`0`, `yes`/`no`. |
+| `SHOW_THINKING` | Optional: `true` behält die Denkschritte von Reasoning-Modellen in der Ausgabe (Konsole, Open WebUI als `<think>`-Block), statt sie wegzulassen. Leer oder `false` ist der Standard. Mit `true` scheitern JSON-Antworten in Lektion 04, 06, 07 und 08 (in Lektion 04 bekommt der Fragen-Index keine neuen Fragen), und die Auswertung in Lektion 08 wird unzuverlässig. Erlaubt: `true`/`false`, `1`/`0`, `yes`/`no`. |
 | `REMOTE_EMBEDDING_MODEL_NAME` | Identifier des E5-Modells. |
 | `REMOTE_EMBEDDING_GEMMA_MODEL_NAME` | Identifier von EmbeddingGemma, nur für Lektion 03, Teil 2 und 3. |
 | `ALL_DOCUMENTS` | Optional: `true` zeigt die Detailausgabe von Lektion 04, Teil 1 bis 3 für alle Dokumente (nur die Ausgabe, nie der Index). Jeder Wert (`true` oder `false`) überschreibt die Konstante in `chunking.ts`; leer gilt die Konstante. |

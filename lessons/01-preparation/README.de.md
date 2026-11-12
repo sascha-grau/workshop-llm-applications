@@ -30,7 +30,7 @@ Die Aufgaben stehen auch am Anfang jeder Datei; maßgeblich sind die Dateiköpfe
 
 1. Ändere die Frage in `model.stream(...)` und starte neu.
 2. Setze beim ChatOpenAI-Objekt `temperature: 1.5` und frage mehrmals dasselbe. Was ändert sich? (`temperature` steuert, wie zufällig die Wortwahl ist; 0 = möglichst gleichbleibend.)
-3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `.text` aus. Wann siehst du die Antwort?
+3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `modelText(response)` aus (nur `.text` lässt mit `SHOW_THINKING=true` die Denkschritte weg). Wann siehst du die Antwort?
 
 ### Teil 2 – `02-open-webui.ts`
 

@@ -56,7 +56,7 @@ async function main() {
     // Wiederholungen würden in Burp als verwirrende Doppelanfragen auftauchen: lieber sofort scheitern.
     maxRetries: 0,
     temperature: 0,
-    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });

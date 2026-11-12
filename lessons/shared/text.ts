@@ -16,7 +16,6 @@ export type ModelOutput = {
 
 // Die Denkschritte einer Modell-Antwort. Der Server schickt sie in einem eigenen Feld (`reasoning`, manche
 // Server: `reasoning_content`), nicht als `<think>` im Text; LangChain verwirft das Feld, deshalb setzen die
-// Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
 // Chat-Clients `__includeRawResponse: true`, damit die Rohantwort erhalten bleibt. Ohne Denkschritte: "".
 export function modelReasoning(output: ModelOutput): string {
   const extra = output.additional_kwargs;
@@ -59,7 +58,8 @@ export function stripThinking(text: string): string {
 
 // Kleine Modelle verpacken JSON gern in einen Markdown-Codeblock (```json … ```). `stripJsonFence` entfernt
 // diesen Rahmen, damit `JSON.parse` den Inhalt lesen kann. Ohne Rahmen kommt der getrimmte Text unverändert zurück.
-// Denkschritte (`<think>…</think>`, siehe `stripThinking`) entfernt sie vorher.
+// Denkschritte (`<think>…</think>`, siehe `stripThinking`) entfernt sie vorher (mit SHOW_THINKING=true nicht:
+// Dann scheitert `JSON.parse`, gewollt).
 export function stripJsonFence(text: string): string {
   const trimmed = stripThinking(text);
   return /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(trimmed)?.[1] ?? trimmed;

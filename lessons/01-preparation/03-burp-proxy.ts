@@ -53,7 +53,7 @@ async function main() {
     maxRetries: 0,
     // NEU: Eine vollständige Antwort ist in Burp viel leichter zu lesen als viele kleine Stücke.
     disableStreaming: true,
-    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
@@ -66,13 +66,15 @@ async function main() {
   ollamaApi.postApiChat(async (chatRequest, chatModel, chatResponse) => {
     const signal = requestAbortSignal(chatResponse);
     await logInvocation('Model', { messages: chatRequest.messages.length }, async () => {
-      // `invoke` wartet auf die ganze Antwort; `.text` ist ihr Text.
+      // `invoke` wartet auf die ganze Antwort; `sendChatStream` holt den Text (mit SHOW_THINKING=true auch die
+      // Denkschritte) daraus.
       const response = await chatModel.invoke(toPlainMessages(chatRequest.messages), { signal });
       await sendChatStream(chatResponse, response, signal);
     });
   });
 
-  // Zum Ausprobieren (Aufgabe 3) einkommentieren und im Handler `invoke` + `sendChatStream(... response.text ...)` ersetzen:
+  // Zum Ausprobieren (Aufgabe 3) einkommentieren und im Handler `invoke` + `sendChatStream(…, response, …)`
+  // ersetzen:
   //   const stream = await chatModel.stream(toPlainMessages(chatRequest.messages), { signal });
   //   await sendChatStream(chatResponse, stream, signal);
 

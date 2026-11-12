@@ -314,7 +314,7 @@ export async function startRag(options: RagConfiguration | ((checkServer: () => 
   const model = new ChatOpenAI({
     timeout: MODEL_TIMEOUT_MS,
     model: remoteModel.name, apiKey: remoteModel.apiKey, maxRetries: 0, temperature: 0,
-    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });

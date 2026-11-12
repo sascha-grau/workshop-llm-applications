@@ -56,6 +56,8 @@ The answer ends with a source list that the code appends (`formatSourceList`, se
 
 ### Part 3 – `03-tool-call-base.ts`
 
+With `SHOW_THINKING=true` in `.env`, the model's thinking stays in the chat history of this part, and the model reads it again in the next round.
+
 1. Ask `Welcher Tag ist heute?` (What day is it today?) and look in Burp for `tools` in the request and `tool_calls` in the response.
 2. Add a second tool (e.g. `randomNumber`, schema with `max: z.number()`) and register it in `toolsByName`. Call it with a fitting question. Hint: the function receives its arguments as an object, so `({ max }) => String(Math.floor(Math.random() * max))` (the arguments are what the schema describes). In `toolsByName` you add `[randomNumber.name, randomNumber]`.
 3. Set `MAX_TOOL_ROUNDS` to 1. What happens with the date question?

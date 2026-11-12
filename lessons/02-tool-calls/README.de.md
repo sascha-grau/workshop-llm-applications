@@ -52,6 +52,8 @@ Die Antwort endet mit einer Quellenliste, die der Code anhängt (`formatSourceLi
 
 ### Teil 3 – `03-tool-call-base.ts`
 
+Mit `SHOW_THINKING=true` in `.env` bleibt das Denken des Modells im Chatverlauf dieses Teils, und das Modell liest es in der nächsten Runde wieder.
+
 1. Frage "Welcher Tag ist heute?" und suche in Burp `tools` in der Anfrage und `tool_calls` in der Antwort.
 2. Füge ein zweites Werkzeug hinzu (z. B. `randomNumber`, Schema mit `max: z.number()`) und trage es in `toolsByName` ein. Rufe es mit einer passenden Frage auf. Tipp: Die Funktion bekommt ihre Argumente als Objekt, also `({ max }) => String(Math.floor(Math.random() * max))` (die Argumente sind das, was das Schema beschreibt). In `toolsByName` ergänzt du `[randomNumber.name, randomNumber]`.
 3. Setze `MAX_TOOL_ROUNDS` auf 1. Was passiert bei der Datumsfrage?

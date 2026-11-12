@@ -87,10 +87,10 @@ export function createChatModel(): ChatOpenAI {
     // 0: dieselbe Eingabe soll möglichst dasselbe Urteil ergeben. Ein Messgerät, das bei jedem Lauf
     // anders anzeigt, misst nichts.
     temperature: 0,
-    // Ohne Denkschritte bitten wir den Server um keine (`reasoning_effort`); mancher Server, auch der
-    // Workshop-Server, ignoriert das, `modelText` lässt sie dann trotzdem weg.
+    // Ohne Denkschritte bitten wir den Server um keine (`reasoning_effort`); mancher Server ignoriert
+    // das, `modelText` lässt sie dann trotzdem weg.
     modelKwargs: settings.showThinking ? {} : { reasoning_effort: 'none' },
-    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });

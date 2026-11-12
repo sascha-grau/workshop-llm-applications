@@ -92,7 +92,7 @@ async function main() {
     disableStreaming: true,
     // 0: dieselbe Frage und derselbe Chunk sollen möglichst dieselbe Zahl ergeben.
     temperature: 0,
-    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
     callbacks: [{ handleLLMEnd: (output) => { llmTokens += output.llmOutput?.tokenUsage?.totalTokens ?? 0; } }],

@@ -38,15 +38,15 @@
 #        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
 # Dauer: gemessen rund 30 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
 # (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 20 Minuten, auf langsamer Hardware länger.
-# Strg+C hält an;
-# `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed … shutting down" nach
+# Strg+C hält an; `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed … shutting down" nach
 # Strg+C heißen nur: Diese Urteile wurden abgebrochen.
 #
 # Aufgabe:
 #   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).
 #      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
 #      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
-#      fehlt sie, siehe `promptfoo-testcases.ts`.)
+#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote ist in allen Spalten gleich, nur F-05
+#      fehlt; die Unterschiede im MRR sind klein, mit elf Fragen gibt es keinen klaren Sieger.)
 #   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
 #      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
 #   3. Ändere `topK` bei einem Provider auf 3 (unter `config`) und starte erneut. Wie ändern sich
@@ -97,9 +97,11 @@ defaultTest:
         # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
         apiKeyRequired: false
         temperature: 0
-        # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte (`promptfoo-judge.ts` schaltet sie ab): Mit
-        # ihnen schrieb qwen3.5-4b vor jedem Urteil rund 2500 Tokens, stieß an die Grenze und lieferte gar keine
-        # Antwort (promptfoo meldet dann "context-faithfulness produced malformed response").
+        # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte; `promptfoo-judge.ts` bittet per
+        # `reasoning_effort: none` darum und verbirgt sie (ein Server darf die Bitte ignorieren, das Limit muss
+        # sie dann mit abdecken). Mit ihnen schrieb qwen3.5-4b vor jedem Urteil rund 2500 Tokens, stieß an die
+        # Grenze und lieferte gar keine Antwort (promptfoo meldet dann "context-faithfulness produced malformed
+        # response").
         max_tokens: 2048
   assert:
     # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die

@@ -8,7 +8,7 @@
 //   zählt jede dieser Zeilen als Aussage: drei echte Aussagen, alle "Yes", ergäben 3 von 9.
 // - `reasoning_effort: 'none'`, nur wenn das Denken verborgen ist: Ein Judge braucht es nicht. Das steht hier
 //   und nicht in der YAML-Datei; ein `passthrough.reasoning_effort` dort hat Vorrang. Ein Server darf den Wert
-//   ignorieren (der Workshop-Server tut das): Entscheidend ist das Verbergen, und `max_tokens` (2048 in der
+//   ignorieren (manche tun das): Entscheidend ist das Verbergen, und `max_tokens` (2048 in der
 //   YAML-Datei) muss dann auch das Denken abdecken, siehe README.
 // Mit SHOW_THINKING=true bleibt beides aus: Der Judge zeigt sein Denken, die Auswertung wird unzuverlässig.
 // Fehlen Modell, Adresse oder der Name der Schlüssel-Variable, bricht der Provider mit einer Meldung ab.
