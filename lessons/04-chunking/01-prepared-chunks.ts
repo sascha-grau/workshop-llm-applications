@@ -34,8 +34,9 @@
 // Aufgabe:
 //   1. Ändere `DEMO_QUESTION` in chunking.ts (z. B. "Was ist ein Jailbreak?"). Stehen die Treffer
 //      noch im richtigen Dokument?
-//   2. Ändere `EXAMPLE_DOCUMENT` in chunking.ts auf ein anderes Dokument aus dem Manifest. Wie
-//      viele Chunks hat es, und wie viele Zeichen je Token?
+//   2. Ändere `EXAMPLE_DOCUMENT` in chunking.ts auf ein anderes Dokument aus dem Manifest (oder setze
+//      `ALL_DOCUMENTS = true`, dann zeigt Teil 1 bis 3 alle Dokumente). Wie viele Chunks hat es,
+//      und wie viele Zeichen je Token?
 //      Setze den Wert danach zurück; Teil 2 bis 4 nutzen ihn (Teil 4 baut damit den Fragen-Index, den Lektion 07, Teil 3 liest).
 //   3. Schau dir die Spalte "characters per token" an: Welche Chunks liegen deutlich unter 4? Was
 //      steht in ihnen (Tipp: Linklisten)? (Nur aussagekräftig, wenn `counting_method` im Manifest
@@ -46,7 +47,7 @@ import { checkModelServer } from '../shared/diagnostics.ts';
 import { e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
 import { writeIndex, readIndex, DEFAULT_TOP_K, type IndexEntry, type ChunkMetadata } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, EXAMPLE_DOCUMENT, previewText, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readManifest, readChunk } from './chunking.ts';
+import { requirePreparedChunks, embedTexts, exampleDocuments, previewText, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readManifest, readChunk } from './chunking.ts';
 import { COUNTING_METHOD } from './formats.ts';
 import { runMain } from '../shared/startup.ts';
 
@@ -68,14 +69,16 @@ async function main() {
   if (manifest.counting_method === COUNTING_METHOD.estimate) {
     console.log('Token counts in the manifest are conservative character estimates, not guaranteed token counts.');
   }
-  console.log(`Chunks from ${EXAMPLE_DOCUMENT} (limit: ${manifest.limit} tokens):`);
-  console.table(chunks.filter(({ source }) => source === EXAMPLE_DOCUMENT).map(({ chunkFile, tokens, text }) => ({
-    file: chunkFile,
-    characters: text.length,
-    tokens: tokens,
-    'characters per token': (text.length / tokens).toFixed(1),
-    preview: previewText(text),
-  })));
+  for (const document of exampleDocuments(manifest)) {
+    console.log(`Chunks from ${document} (limit: ${manifest.limit} tokens):`);
+    console.table(chunks.filter(({ source }) => source === document).map(({ chunkFile, tokens, text }) => ({
+      file: chunkFile,
+      characters: text.length,
+      tokens: tokens,
+      'characters per token': (text.length / tokens).toFixed(1),
+      preview: previewText(text),
+    })));
+  }
 
   // Hat man keinen Tokenizer zur Hand, muss man Tokens aus den Zeichen schätzen, wie Teil 4 es für
   // seine Kostenzeile tut. Das kleinste Verhältnis im ganzen Korpus ist der ungünstigste Fall, mit dem

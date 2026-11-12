@@ -1,10 +1,10 @@
 // Gemeinsame Hilfsfunktionen für Lektion 04 (erstmals in 01-prepared-chunks.ts benutzt): alles, was
 // in allen Teilen identisch sein muss, damit sich ihre Ergebnisse vergleichen lassen. Das
 // Schneiden steht in den Teilen selbst. Die Index-Funktionen (Dateien lesen und schreiben, Ranking)
-// liegen in `shared/index.ts`, weil auch Lektion 05 bis 07 sie brauchen; die Teile importieren sie von dort
+// liegen in `shared/index.ts`, weil auch Lektion 05 bis 08 sie brauchen; die Teile importieren sie von dort
 // direkt. Hier liegen:
-// - Konfiguration: `DEMO_QUESTION`, Pfade, Korpus-Konstanten
-// - Manifest und Chunks lesen: readManifest, readChunk(s), splitByHeadings, sourcesFor, percentile
+// - Konfiguration: `DEMO_QUESTION`, Pfade, Korpus-Konstanten, Beispieldokument (`EXAMPLE_DOCUMENT`, `ALL_DOCUMENTS`)
+// - Manifest und Chunks lesen: readManifest, readChunk(s), splitByHeadings, sourcesFor, exampleDocuments, percentile
 // - Metadaten: metadataFor (inkl. Zugriffsgruppe `accessGroup`: "public" oder "internal")
 // - Dateiformate: `formats.ts` (Versionsnummer und zod-Schema des Manifests; alte Dateien werden abgelehnt)
 // - Suche und Ausgabe: embedTexts, searchTop (Top-k-Suche; Teil 1 bis 3 rufen sie mit `DEFAULT_TOP_K` aus `shared/index.ts` auf), printStats, printHits
@@ -32,7 +32,11 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
 // Die vorbereiteten Chunks aus Teil 0: mehrere Dateien pro Dokument, benannt `<Dokument>--<Nummer>.md`.
 export const CHUNK_DIRECTORY = join(contentDirectory, 'owasp-genai-top-10', 'chunks');
+// Welche Dokumente Teil 1 bis 3 im Detail anzeigen (Chunk-Tabellen, in Teil 3 auch Abstände und
+// Schnitte): false = nur EXAMPLE_DOCUMENT, true = alle Dokumente (längere Ausgabe). In Teil 4 wirkt
+// der Schalter nur bei FULL_CORPUS = false; dann erzeugt Teil 4 Fragen für diese Dokumente.
 export const EXAMPLE_DOCUMENT = '01-llm01-prompt-injection.md';
+export const ALL_DOCUMENTS = false;
 // Die Ausgabe der OWASP-Liste. Sie gehört zum Korpus, deshalb bekommt jeder Chunk denselben Wert.
 export const CORPUS_VERSION = '2025';
 export type AccessGroup = ChunkMetadata['accessGroup'];
@@ -70,6 +74,14 @@ export function sourcesFor(subset: string[] = [], manifest = readManifest()): st
   const unknown = subset.filter((source) => !sources.includes(source));
   if (unknown.length) throw new Error(`Unknown document in SUBSET: ${unknown.join(', ')}. Check manifest.json.`);
   return subset.length ? subset : sources;
+}
+
+// Die Dokumente für die Detailausgabe: alle aus dem Manifest (ALL_DOCUMENTS) oder nur EXAMPLE_DOCUMENT.
+export function exampleDocuments(manifest = readManifest()): string[] {
+  const sources = manifest.sources.map(({ file }) => file);
+  if (ALL_DOCUMENTS) return sources;
+  if (!sources.includes(EXAMPLE_DOCUMENT)) throw new Error(`Unknown EXAMPLE_DOCUMENT: ${EXAMPLE_DOCUMENT}. Check manifest.json.`);
+  return [EXAMPLE_DOCUMENT];
 }
 
 // Liest eine vorbereitete Chunk-Datei, z. B. `01-llm01-prompt-injection--003.md` (Teil von

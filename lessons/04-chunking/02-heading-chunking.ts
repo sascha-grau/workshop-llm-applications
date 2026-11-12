@@ -14,14 +14,14 @@
 // Preis: Ein Abschnitt, den Teil 0 auf zwei vorbereitete Chunks verteilen musste, bleibt auch
 // hier zwei Chunks.
 //
-// Das Programm zeigt die Chunks eines Beispieldokuments, bettet den Korpus ein, schreibt Text,
-// Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
+// Das Programm zeigt die Chunks der Beispieldokumente (`ALL_DOCUMENTS`), bettet den Korpus ein,
+// schreibt Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
 //
 // Vergleiche die drei Treffer mit denen aus Teil 1: Ein vorbereiteter Chunk füllt das Token-Limit
 // und mischt mehrere Abschnitte, sein Vektor ist ein Mittelwert aus allen. Ein Chunk mit genau
 // einem Abschnitt hat einen Vektor für genau dieses Thema, und eine Frage dazu findet ihn direkt.
 //
-// Dieser Index (`headings`) ist die Grundlage von Lektion 05 bis 07: Die Retrieval-Strategien, Hybrid-Suche und Reranking (Qdrant) sowie RAG (Teil 1) laden genau diese Datei.
+// Dieser Index (`headings`) ist die Grundlage von Lektion 05 bis 08: Die Retrieval-Strategien, Hybrid-Suche und Reranking (Qdrant), RAG (Teil 1) und die Evaluierung laden genau diese Datei.
 //
 // Voraussetzungen: LM Studio läuft mit gestartetem Server und geladenem E5-Modell; die
 // vorbereiteten Chunks existieren (`npm run l04:0`). Burp ist optional.
@@ -32,7 +32,7 @@
 //      `#{1,3}` auf `#{1,2}`. Wie ändert sich die Zahl der Chunks, und was passiert mit den Treffern?
 //   2. Trage in `SUBSET` einen Dokumentnamen ein (z. B. den von EXAMPLE_DOCUMENT), dann läuft das
 //      Einbetten schneller.
-//      Setze `SUBSET` danach wieder auf `[]` und starte `npm run l04:2` neu, sonst kennen Lektion 05 bis 07 nur dieses Dokument.
+//      Setze `SUBSET` danach wieder auf `[]` und starte `npm run l04:2` neu, sonst kennen Lektion 05 bis 08 nur dieses Dokument.
 //   3. Ändere `DEMO_QUESTION` in chunking.ts und vergleiche die besten drei Treffer (`DEFAULT_TOP_K`) mit Teil 1.
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
@@ -40,7 +40,7 @@ import { checkModelServer } from '../shared/diagnostics.ts';
 import { e5Model } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
 import { writeIndex, readIndex, DEFAULT_TOP_K, sectionPath, type IndexEntry, type ChunkMetadata } from '../shared/index.ts';
-import { requirePreparedChunks, embedTexts, EXAMPLE_DOCUMENT, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readChunks, sourcesFor } from './chunking.ts';
+import { requirePreparedChunks, embedTexts, exampleDocuments, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readChunks, sourcesFor } from './chunking.ts';
 import { runMain } from '../shared/startup.ts';
 
 // Leer heißt: der ganze Korpus. Eine Liste von Dokumentnamen indexiert nur diese Dokumente
@@ -55,12 +55,14 @@ async function main() {
 
   const sources = sourcesFor(SUBSET);
 
-  console.log(`Chunks from ${EXAMPLE_DOCUMENT}:`);
-  console.table(readChunks(EXAMPLE_DOCUMENT).map((chunk) => ({
-    characters: chunk.text.length,
-    section: sectionPath(chunk.headingPath),
-    preview: previewChunk(chunk),
-  })));
+  for (const document of exampleDocuments()) {
+    console.log(`Chunks from ${document}:`);
+    console.table(readChunks(document).map((chunk) => ({
+      characters: chunk.text.length,
+      section: sectionPath(chunk.headingPath),
+      preview: previewChunk(chunk),
+    })));
+  }
 
   await checkModelServer({ viaBurp: true });
 

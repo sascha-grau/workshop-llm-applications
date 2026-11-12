@@ -13,15 +13,15 @@
 | 4 | `04-question-generation-chunking.ts` | `npm run l04:4` | Search with generated questions (multi-vector index) | Part 0, LM Studio (chat and E5) |
 | 5 | `05-parent-document.ts` | `npm run l04:5` | Search small pieces, deliver the whole section (parent document) | Index from `l04:2`, LM Studio (E5) |
 
-`chunking.ts` and `formats.ts` are helper modules (shared functions, file formats: manifest version and manifest schema), not parts of their own. Reading and writing the index and the ranking live in [`shared/index.ts`](../shared/index.ts) because Lessons 05 to 07 use them too; the parts import them from there directly.
+`chunking.ts` and `formats.ts` are helper modules (shared functions, file formats: manifest version and manifest schema), not parts of their own. Reading and writing the index and the ranking live in [`shared/index.ts`](../shared/index.ts) because Lessons 05 to 08 use them too; the parts import them from there directly.
 
-**Order:** Run Part 0 first; it creates the chunk files (they are not in the repository). After that you can run Parts 1 to 4 in any order; each writes its own index to `indexes/`. Part 5 writes no index; it reads the one from `l04:2`. Lessons 05 to 07 read these indexes: Lesson 05 the one from `l04:2` in all parts, Lesson 06 loads all of them into Qdrant (`npm run l06:1`), and Lesson 07 uses the one from `l04:2` for Part 1, `l04:3` for Part 2, `l04:4` for Part 3 (Parts 4 to 7 use `l04:2` again). Old chunks or indexes are rejected with a message; regenerate them in that case.
+**Order:** Run Part 0 first; it creates the chunk files (they are not in the repository). After that you can run Parts 1 to 4 in any order; each writes its own index to `indexes/`. Part 5 writes no index; it reads the one from `l04:2`. Lessons 05 to 08 read these indexes: Lesson 05 the one from `l04:2` in all parts, Lesson 06 loads all of them into Qdrant (`npm run l06:1`), and Lesson 07 uses the one from `l04:2` for Part 1, `l04:3` for Part 2, `l04:4` for Part 3 (Parts 4 to 7 use `l04:2` again); Lesson 08 reads the one from `l04:2`. Old chunks or indexes are rejected with a message; regenerate them in that case.
 
 **Part 0 is long:** `00-prepare-chunks.ts` has almost 500 lines. The trainer runs it; you only need to read the lines marked `// KERN:` (the cutting loop, the budget check and the detection of inputs that are too long). The rest is safeguarding.
 
 **Verifying Part 0 and help:** `npm run l04:0 -- --verify` checks the existing chunks against the source documents and the token limit without creating new ones (depending on the counting method, this costs another round of requests to the embedding endpoint). `npm run l04:0 -- --help` prints brief usage help. The `--` separates the npm options from those of the program. If `chunks/` already exists, a normal run aborts instead of overwriting anything: use `--verify` or move the folder.
 
-**Part 4 and the corpus:** By default (`FULL_CORPUS = false` in `04-question-generation-chunking.ts`), Part 4 indexes only `01-llm01-prompt-injection.md`. For the whole corpus, set `FULL_CORPUS = true` and restart; the first run takes many minutes because the chat model writes questions for every chunk. Finished chunks stay in the index, so an interruption costs at most the chunk in progress. Lesson 07, Part 3 then also finds questions about the other documents.
+**Part 4 and the corpus:** By default `FULL_CORPUS = true` in `04-question-generation-chunking.ts`, so Part 4 writes questions for the whole corpus; the first run takes many minutes because the chat model writes questions for every chunk. For a quick run set `FULL_CORPUS = false`: Part 4 then covers only the example documents, i.e. `EXAMPLE_DOCUMENT` (`01-llm01-prompt-injection.md`), or all documents if `ALL_DOCUMENTS = true` in `chunking.ts`. Finished chunks stay in the index, so an interruption costs at most the chunk in progress. Lesson 07, Part 3 then also finds questions about the other documents.
 
 ## Chat language
 
@@ -33,7 +33,7 @@ The prompt in Part 4 that generates the questions (`04-question-generation-chunk
 - **Heading chunking:** cutting at the Markdown headings (`#{1,3}` in `splitByHeadings`), so each section becomes a chunk that starts with its heading path (Part 2).
 - **Semantic chunking:** the embedding model finds the topic jumps itself: neighbouring sentence windows are embedded, their distance is 1 minus cosine similarity, and cuts are made at distances above the percentile threshold (`DISTANCE_PERCENTILE = 95`; the 95th percentile is the value below which 95 % of the distances lie). Short documents (fewer than 4 distances) are cut only at headings (Part 3).
 - **Question generation / multi-vector index:** the chat model writes `QUESTIONS_PER_CHUNK` (3) questions per chunk; each question becomes its own search vector pointing to the original chunk text, so the search compares question with question (Part 4).
-- **Index file:** the JSON file under `indexes/` that stores chunk text, metadata and vector; Lessons 05 to 07 read it.
+- **Index file:** the JSON file under `indexes/` that stores chunk text, metadata and vector; Lessons 05 to 08 read it.
 - **Parent document / small-to-big:** the search compares the question with small pieces (children, about `CHILD_SIZE` = 300 characters, each starting with its heading path) and delivers the whole section they come from (the parent). The child decides whether a section is found, the parent what ends up in the prompt (Part 5).
 - **Top-k:** the `k` chunks most similar to the question; the lesson uses `DEFAULT_TOP_K` = 3 for the hits it prints. Lesson 05 examines the rule.
 - **No overlap:** the chunks do not overlap. Part 0 cuts at paragraph, list-item and sentence boundaries, every chunk gets its heading chain in front, and the manifest check requires the pieces to follow each other without gap or overlap (`Gap or overlap in source coverage`). So a chunk keeps its context without repeating text from its neighbour.
@@ -52,13 +52,13 @@ Translated from the `Aufgabe` block at the top of each file; the file headers re
 ### Part 1 – `01-prepared-chunks.ts`
 
 1. Change `DEMO_QUESTION` in `chunking.ts` (e.g. `Was ist ein Jailbreak?` (What is a jailbreak?)). Are the hits still in the right document?
-2. Change `EXAMPLE_DOCUMENT` in `chunking.ts` to another document from the manifest. How many chunks does it have, and how many characters per token? Reset the value afterwards; Parts 2 to 4 use it (Part 4 builds the question index with it, which Lesson 07, Part 3 reads).
+2. Change `EXAMPLE_DOCUMENT` in `chunking.ts` to another document from the manifest. How many chunks does it have, and how many characters per token? Set `ALL_DOCUMENTS = true` in `chunking.ts` to show the detail output (chunk tables) of Parts 1 to 3 for all documents instead of just one (longer output). Reset the values afterwards; Parts 2 to 4 use it (Part 4 builds the question index with it, which Lesson 07, Part 3 reads).
 3. Look at the "characters per token" column: which chunks are clearly below 4? What is in them (hint: link lists)? (Only meaningful if `counting_method` in the manifest is not `character-estimate`; with `character-estimate` every value is about 1.)
 
 ### Part 2 – `02-heading-chunking.ts`
 
 1. Change the heading depth: in `splitByHeadings` (`chunking.ts`), change both occurrences of `#{1,3}` to `#{1,2}`. How does the number of chunks change, and what happens to the hits?
-2. Put a document name into `SUBSET` (e.g. the one from `EXAMPLE_DOCUMENT`) so embedding runs faster. Afterwards set `SUBSET` back to `[]` and rerun `npm run l04:2`, otherwise Lessons 05 to 07 know only this document.
+2. Put a document name into `SUBSET` (e.g. the one from `EXAMPLE_DOCUMENT`) so embedding runs faster. Afterwards set `SUBSET` back to `[]` and rerun `npm run l04:2`, otherwise Lessons 05 to 08 know only this document.
 3. Change `DEMO_QUESTION` in `chunking.ts` and compare the top three hits (`DEFAULT_TOP_K`) with Part 1.
 
 ### Part 3 – `03-semantic-chunking.ts`
