@@ -8,15 +8,7 @@
 import { INTERNAL_DOCUMENTS } from '../shared/index.ts';
 import { loadQuestionSet } from '../05-retrieval-strategies/retrieval.ts';
 
-// Was in der YAML-Datei unter `tests.config` stehen darf.
-type TestCaseOptions = {
-  // Dateien, die ein Teil-Index abdeckt (der Fragen-Index aus Lektion 04, Teil 4 standardmäßig nur eine).
-  subset?: string[];
-  // Provider für Fragen außerhalb dieser Teilmenge, z. B. ['corpus:*'] für alle Provider mit diesem Label-Anfang.
-  providersOutsideSubset?: string[];
-};
-
-export default function testCases({ subset, providersOutsideSubset }: TestCaseOptions = {}) {
+export default function testCases() {
   return loadQuestionSet().questions
     // Fragen, deren Antwort nur im internen Anhang steht (F-11), kann der Assistent nie beantworten:
     // Er sucht nur in öffentlichen Chunks (Lektion 05, Teil 3). Als Fehlschlag gezählt, würden sie
@@ -25,9 +17,5 @@ export default function testCases({ subset, providersOutsideSubset }: TestCaseOp
     .map(({ id, question, keyPoint, expectedSources }) => ({
       description: id,
       vars: { query: question, keyPoint, expectedSources: expectedSources.join(', ') },
-      // Ein Index, der nur eine Teilmenge enthält, bekommt nur Fragen zu dieser Teilmenge; sonst würde er
-      // für Fragen bestraft, deren Antwort gar nicht in ihm stehen kann. Alle anderen Fragen gehen nur an
-      // die Provider aus `providersOutsideSubset`.
-      ...(subset && !expectedSources.every((source) => subset.includes(source)) && { providers: providersOutsideSubset }),
     }));
 }

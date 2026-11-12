@@ -98,6 +98,7 @@ export const remoteEmbeddingModel = {
 };
 
 export const settings = {
+  get showThinking(): boolean { return optionalBooleanEnv('SHOW_THINKING') ?? false; },
   /** Adresse des Proxy-Listeners von Burp Suite. Ab Lektion 01, Teil 3 läuft der ausgehende Verkehr darüber, wenn sie gesetzt ist. */
   get burpProxyURL(): string | undefined {
     return validatedURL('BURP_PROXY_URL', false);

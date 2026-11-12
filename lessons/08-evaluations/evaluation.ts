@@ -119,7 +119,7 @@ export async function answerFromContext(model: ChatOpenAI, context: string, ques
       ['system', ANSWER_SYSTEM_PROMPT],
       ['user', `${wrapUntrusted('retrieved_context', context)}\n\nFrage: ${question}`],
     ]);
-    // Ohne Denkschritte (`<think>…</think>`): Der Judge soll nur die Antwort prüfen.
+    // Ohne Denkschritte (`<think>…</think>`, außer mit SHOW_THINKING=true): Der Judge soll nur die Antwort prüfen.
     const text = stripThinking(response.text);
     if (!text) throw new Error('The chat model returned an empty answer. Check that the model is loaded and try again.');
     return text;

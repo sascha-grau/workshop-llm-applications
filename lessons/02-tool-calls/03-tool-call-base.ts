@@ -107,7 +107,7 @@ async function main() {
       // gültige und ungültige Aufrufe gemischt sind: Dann läuft in dieser Runde gar kein Werkzeug, und das
       // Modell versucht es in der nächsten Runde noch einmal.
       if (invalidToolCalls.length) {
-        // Denkschritte (`<think>…</think>`) gehören nicht in den Verlauf, den das Modell in der nächsten Runde liest.
+        // Denkschritte (`<think>…</think>`) gehören (außer mit SHOW_THINKING=true) nicht in den Verlauf, den das Modell in der nächsten Runde liest.
         messages.push({ role: 'assistant', content: stripThinking(reply.text) || '(ungültiger Tool-Aufruf)' });
         messages.push({
           role: 'user',

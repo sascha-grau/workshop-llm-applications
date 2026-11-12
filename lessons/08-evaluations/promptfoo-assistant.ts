@@ -61,7 +61,7 @@ export default class RagAssistantProvider implements ApiProvider {
       const context = contextFor(hits);
       const response = await this.model.invoke(promptFor(prompt, [{ role: 'user', content: prompt }], [], context, hits.length));
       return {
-        // Ohne Denkschritte (`<think>…</think>`): promptfoo prüft nur die Antwort, wie Open WebUI sie zeigt.
+        // Ohne Denkschritte (`<think>…</think>`, außer mit SHOW_THINKING=true): promptfoo prüft nur die Antwort, wie Open WebUI sie zeigt.
         output: stripThinking(response.text),
         metadata: { sources: hits.map(({ metadata }) => metadata.source), context },
       };

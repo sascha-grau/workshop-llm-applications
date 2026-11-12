@@ -140,6 +140,7 @@ The settings at a glance:
 | `REMOTE_MODEL_BASE_URL` | Address of the server with `/v1`, for chat and embeddings (LM Studio: `http://localhost:1234/v1`). |
 | `REMOTE_MODEL_API_KEY` | Only needed if the server requires a key. LM Studio does not. |
 | `REMOTE_MODEL_NAME` | Identifier of the chat model from LM Studio. |
+| `SHOW_THINKING` | Optional: `true` shows the thinking of reasoning models (`<think>…</think>`) everywhere instead of hiding it. Empty or `false` is the default. With `true`, the grading in Lesson 08 becomes unreliable. |
 | `ALL_DOCUMENTS` | Optional: `true` shows the detail output of Lesson 04, Parts 1 to 3 for all documents (output only, never the index). Overrides the constant in `chunking.ts`; empty means the constant applies. |
 | `REMOTE_EMBEDDING_MODEL_NAME` | Identifier of the E5 model. |
 | `REMOTE_EMBEDDING_GEMMA_MODEL_NAME` | Identifier of EmbeddingGemma, only for Lesson 03, Parts 2 and 3. |

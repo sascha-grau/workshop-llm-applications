@@ -63,17 +63,16 @@ tests:
 
 defaultTest:
   options:
-    # Der Judge, wie in Teil 5 (dort sind die Zeilen erklärt): das Chat-Modell aus `.env`. Halte beide Blöcke gleich.
+    # Der Judge, wie in Teil 5 (dort sind die Zeilen erklärt): das Chat-Modell aus `.env`, über `promptfoo-judge.ts` (Denkschritte: `SHOW_THINKING`). Halte beide Blöcke gleich.
     provider:
-      id: 'openai:chat:{{ env.REMOTE_MODEL_NAME }}'
+      id: file://promptfoo-judge.ts
       config:
+        model: '{{ env.REMOTE_MODEL_NAME }}'
         apiBaseUrl: '{{ env.REMOTE_MODEL_BASE_URL | default("http://localhost:1234/v1", true) }}'
         apiKeyEnvar: REMOTE_MODEL_API_KEY
         apiKeyRequired: false
         temperature: 0
         max_tokens: 2048
-        passthrough:
-          reasoning_effort: none
   assert:
     # Die Fassade hängt die Quellenliste an die Antwort an (Lektion 07); mehr sieht ein Black-Box-Test nicht.
     - type: javascript
@@ -90,7 +89,8 @@ defaultTest:
       metric: correct
       value: >-
         Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
-        Sagt die Antwort, der Kontext enthalte dazu keine oder keine klare Antwort, ist sie nicht korrekt.
+        Sagt die Antwort, die Quellen enthielten keine Zahlen oder keine klare Antwort, ist das genau dann korrekt,
+        wenn die erwartete Kernaussage dies ebenfalls besagt; andernfalls ist sie nicht korrekt.
 
 # Ein Testfall nach dem anderen: Fassade und lokales Modell beantworten eine Frage nach der anderen.
 evaluateOptions:

@@ -2,9 +2,11 @@
 // über `sendChatStream` auch alles, was Open WebUI anzeigt), `stripJsonFence` für Antworten, die JSON liefern sollen
 // (Lektion 04 Teil 4, Lektion 06 und 07, Lektion 08 Teil 2 und 3), und `formatSourceList` samt `stripSourceList`/`withoutSourceLists` für die
 // Quellenliste unter den Antworten (Lektion 02 Teil 1 und 2, Lektion 07).
+import { settings } from './config.ts';
 
 // Reasoning-Modelle (z. B. qwen3 in LM Studio) schreiben vor die Antwort ihre Denkschritte in einen Block
-// `<think>…</think>`. Die Antwort selbst steht dahinter. Im Workshop zeigen wir nur die Antwort: Die Denkschritte
+// `<think>…</think>`. Die Antwort selbst steht dahinter. Im Workshop zeigen wir nur die Antwort (außer mit SHOW_THINKING=true,
+// dann gibt `stripThinking` den Text unverändert zurück): Die Denkschritte
 // sind lang, oft englisch, würden JSON-Antworten unlesbar machen und gehören nicht in den Chatverlauf.
 // Drei Fälle: vollständige Blöcke (überall im Text), ein Block ohne Ende (Antwort abgebrochen, während das Modell
 // noch dachte: Dann bleibt nichts übrig) und ein schließendes `</think>` ohne öffnendes (manche Chat-Vorlagen
@@ -12,6 +14,7 @@
 // `</think>` (`*?`): Bringt ein eingeschleuster Text das Modell dazu, später noch ein `</think>` zu schreiben,
 // verschwindet so nicht die ganze Antwort davor.
 export function stripThinking(text: string): string {
+  if (settings.showThinking) return text;
   return text
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<think>[\s\S]*$/i, '')

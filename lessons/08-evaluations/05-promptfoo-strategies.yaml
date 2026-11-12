@@ -19,10 +19,9 @@
 # der MRR (der Mittelwert je Spalte), `faithful` die Quellentreue (wie RAGAS: Antwort in Aussagen
 # zerlegen, jede gegen den Kontext prüfen), `correct` die Korrektheit gegen die Kernaussage.
 #
-# Merke: Der Fragen-Index (Lektion 04, Teil 4) enthält standardmäßig nur `01-llm01-prompt-injection.md`
-# (`FULL_CORPUS = false`). Er bekommt deshalb nur Fragen zu dieser Datei (`tests.config.subset`);
-# alle anderen Fragen gehen nur an die Provider mit dem Label `corpus:…`. Setzt du dort
-# `FULL_CORPUS = true` und erzeugst den Index neu, lösche `subset` und benenne den Provider um.
+# Merke: Der Fragen-Index (Lektion 04, Teil 4) deckt mit `FULL_CORPUS = true` (Standard) den ganzen
+# Korpus ab; alle Fragen gehen deshalb an alle vier Provider. Hast du dort `FULL_CORPUS = false` gesetzt,
+# kennt `corpus:questions` nur ein Dokument und schneidet bei den übrigen Fragen schlecht ab.
 # Judge ist das lokale Chat-Modell aus `.env`; ein kleines Modell urteilt unzuverlässig. Kosten: je
 # Frage und Strategie ein Embedding und ein Chat-Aufruf für die Antwort, dazu mehrere Judge-Aufrufe.
 #
@@ -38,7 +37,7 @@
 #        npx promptfoo view   (Ergebnisse als Web-App mit Mittelwert je Spalte, für die Aufgaben; lauscht
 #        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
 # Dauer: gemessen rund 15 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
-# (gut 35 Zellen) dauert also etwa 10 Minuten, auf langsamer Hardware länger. Strg+C hält an;
+# (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 11 Minuten, auf langsamer Hardware länger. Strg+C hält an;
 # `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed … shutting down" nach
 # Strg+C heißen nur: Diese Urteile wurden abgebrochen.
 #
@@ -70,24 +69,23 @@ providers:
     label: corpus:semantic
     config: { strategy: semantic }
   - id: file://promptfoo-assistant.ts
-    label: subset:questions
+    label: corpus:questions
     config: { strategy: questions }
 
-# Die Fragen aus dem Fragen-Set von Lektion 05 außer F-11. Der Fragen-Index bekommt nur die Fragen zu `subset`.
+# Die Fragen aus dem Fragen-Set von Lektion 05 außer F-11; jede geht an alle Provider.
 tests:
   path: file://promptfoo-testcases.ts
-  config:
-    subset: [01-llm01-prompt-injection.md]
-    providersOutsideSubset: ['corpus:*']
 
 defaultTest:
   options:
     # Der Judge: das Chat-Modell aus `.env` über die OpenAI-kompatible API von LM Studio. Ohne diese
     # Angabe würde promptfoo OpenAI in der Cloud fragen. Ein stärkeres Modell? Nur die Werte ändern.
+    # `promptfoo-judge.ts` verpackt `openai:chat:<model>` und regelt die Denkschritte (`SHOW_THINKING`, siehe dort).
     # Derselbe Block steht in Teil 6; halte beide gleich.
     provider:
-      id: 'openai:chat:{{ env.REMOTE_MODEL_NAME }}'
+      id: file://promptfoo-judge.ts
       config:
+        model: '{{ env.REMOTE_MODEL_NAME }}'
         # Fällt auf LM Studio zurück, nie auf OpenAI in der Cloud, falls die Variable fehlt oder leer ist
         # (`true`: auch ein leerer Wert gilt als fehlend).
         apiBaseUrl: '{{ env.REMOTE_MODEL_BASE_URL | default("http://localhost:1234/v1", true) }}'
@@ -97,15 +95,10 @@ defaultTest:
         # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
         apiKeyRequired: false
         temperature: 0
-        # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte: Mit ihnen schrieb qwen3.5-4b vor
-        # jedem Urteil rund 2500 Tokens, stieß an die Grenze und lieferte gar keine Antwort (promptfoo
-        # meldet dann "context-faithfulness produced malformed response").
+        # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte (`promptfoo-judge.ts` schaltet sie ab): Mit
+        # ihnen schrieb qwen3.5-4b vor jedem Urteil rund 2500 Tokens, stieß an die Grenze und lieferte gar keine
+        # Antwort (promptfoo meldet dann "context-faithfulness produced malformed response").
         max_tokens: 2048
-        # Schaltet die Denkschritte ab; `passthrough` geht unverändert an LM Studio. qwen3.5 in LM Studio
-        # hält sich daran (gemessen: 57 statt rund 2500 Tokens). Ein Modell, das den Wert nicht kennt,
-        # ignoriert ihn; dann reicht `max_tokens` vielleicht nicht, siehe README.
-        passthrough:
-          reasoning_effort: none
   assert:
     # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die
     # Trefferquote (Teil 1). Die Treffer stehen in den Metadaten des Providers, nicht in der Antwort.
@@ -138,7 +131,8 @@ defaultTest:
       metric: correct
       value: >-
         Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
-        Sagt die Antwort, der Kontext enthalte dazu keine oder keine klare Antwort, ist sie nicht korrekt.
+        Sagt die Antwort, die Quellen enthielten keine Zahlen oder keine klare Antwort, ist das genau dann korrekt,
+        wenn die erwartete Kernaussage dies ebenfalls besagt; andernfalls ist sie nicht korrekt.
 
 # Ein Testfall nach dem anderen: Ein lokales Modell antwortet nacheinander schneller als parallel.
 evaluateOptions:
