@@ -36,8 +36,9 @@
 #        wählen und F5 drücken ("Run current file" ist nur für .ts-Dateien; der Bericht heißt gleich)
 #        npx promptfoo view   (Ergebnisse als Web-App mit Mittelwert je Spalte, für die Aufgaben; lauscht
 #        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
-# Dauer: gemessen rund 15 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
-# (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 11 Minuten, auf langsamer Hardware länger. Strg+C hält an;
+# Dauer: gemessen rund 30 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
+# (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 20 Minuten, auf langsamer Hardware länger.
+# Strg+C hält an;
 # `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed … shutting down" nach
 # Strg+C heißen nur: Diese Urteile wurden abgebrochen.
 #
@@ -80,7 +81,8 @@ defaultTest:
   options:
     # Der Judge: das Chat-Modell aus `.env` über die OpenAI-kompatible API von LM Studio. Ohne diese
     # Angabe würde promptfoo OpenAI in der Cloud fragen. Ein stärkeres Modell? Nur die Werte ändern.
-    # `promptfoo-judge.ts` verpackt `openai:chat:<model>` und regelt die Denkschritte (`SHOW_THINKING`, siehe dort).
+    # `promptfoo-judge.ts` verpackt `openai:chat:<Modell>`; `showThinking` und `reasoning_effort` setzt es
+    # selbst (siehe `SHOW_THINKING` in `.env.example`), sie stehen deshalb nicht hier.
     # Derselbe Block steht in Teil 6; halte beide gleich.
     provider:
       id: file://promptfoo-judge.ts
@@ -125,14 +127,15 @@ defaultTest:
       contextTransform: context.metadata.context
       threshold: 1
     # Korrektheit (Teil 3): Die Rubrik ist der Prompt des Judge. Dieselbe Rubrik steht in Teil 6;
-    # änderst du sie, ändere beide, sonst sind die Spalten nicht vergleichbar. Der zweite Satz ist Absicht: Ohne ihn
-    # wertet ein Judge "der Kontext enthält dazu nichts" oft als korrekt (siehe `HONEST_NO` in Teil 3).
+    # änderst du sie, ändere beide, sonst sind die Spalten nicht vergleichbar. Der zweite Satz ist Absicht:
+    # Ohne ihn wertet ein Judge "der Kontext enthält dazu nichts" oft als korrekt (siehe `HONEST_NO` in
+    # Teil 3). Die Ausnahme am Ende gilt für F-10: Dort lautet die Kernaussage "OWASP nennt keine Zahlen".
     - type: llm-rubric
       metric: correct
       value: >-
         Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
-        Sagt die Antwort, die Quellen enthielten keine Zahlen oder keine klare Antwort, ist das genau dann korrekt,
-        wenn die erwartete Kernaussage dies ebenfalls besagt; andernfalls ist sie nicht korrekt.
+        Eine Antwort, die nur sagt, sie finde dazu nichts oder die Quellen enthielten dazu keine (klare) Angabe,
+        ist nicht korrekt – außer die erwartete Kernaussage sagt genau das (z. B. „OWASP nennt keine Zahlen“).
 
 # Ein Testfall nach dem anderen: Ein lokales Modell antwortet nacheinander schneller als parallel.
 evaluateOptions:

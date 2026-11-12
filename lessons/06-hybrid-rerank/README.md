@@ -22,6 +22,8 @@
 
 **No access filter in this lesson:** The searches in Parts 2 to 7 query Qdrant without the access filter, on purpose, to keep them easy to read. They therefore also see the `internal` appendix, and Parts 5 to 7 can send it to the chat model in the reranking and multi-query prompts. Lesson 07 adds `PUBLIC_FILTER` (OWASP LLM02 and LLM08).
 
+**`SHOW_THINKING`:** With `SHOW_THINKING=true` in `.env`, the model's thinking is put in front of answers that are parsed as JSON: in Part 5 the reranking ratings fail (fallback scores, reranking effectively off), in Part 6 the multi-query rewriting fails and the run stops, and the full demo (`l06:7`) suffers both. Keep it empty or `false` here.
+
 **Burp and Qdrant:** Burp does not see the requests to Qdrant: the Qdrant client uses its own connection pool, which the proxy setting does not reach (see `hybrid.ts`). Burp still shows the calls to the embedding and chat model. You watch Qdrant in its dashboard at `<QDRANT_URL>/dashboard`, for example `http://localhost:6333/dashboard`.
 
 **Measured values:** BM25 scores and cosine similarities cannot be compared with each other (BM25 is open-ended, cosine with E5 is mostly 0.7 to 0.9). Compare the order of the hits, not the values. The model-based parts (5 to 7) depend on the chat model; a small model rates less evenly. Reranking makes one chat call per candidate (`CANDIDATES`, 8 by default) for every question: fine locally, but it costs money on a paid API.

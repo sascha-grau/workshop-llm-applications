@@ -7,7 +7,7 @@
 // Logging-Regel (siehe shared/logging.ts): Fragen, Antworten und Chunk-Texte kommen nie ins Log.
 // Die Aufrufe unten protokollieren nur Zahlen (Anzahl und Länge der Fassungen, Länge der Frage,
 // Punkt-IDs), keine Texte.
-import { stripJsonFence } from '../shared/text.ts';
+import { modelText, stripJsonFence } from '../shared/text.ts';
 import { z } from 'zod';
 import { getQdrantClient, requireCollection, getCollectionName } from '../06-hybrid-rerank/hybrid.ts';
 import { abortable } from '../shared/abort.ts';
@@ -90,7 +90,7 @@ export const rerankRetrieval = (candidates: number, textLimit: number, candidate
           `Frage: ${question}\n\nAbschnitt:\n${source.text.slice(0, textLimit)}`,
           { signal },
         );
-        return ratingSchema.parse(jsonFromAnswer(response.text)).score;
+        return ratingSchema.parse(jsonFromAnswer(modelText(response))).score;
       }).catch((error) => {
         if (isAbortError(error, signal)) throw error;
         return undefined;
@@ -116,7 +116,7 @@ export const multiqueryRetrieval = (variantCount: number, candidatesPerList: num
         `Frage: ${question}`,
         { signal },
       );
-      return variantSchema.parse(jsonFromAnswer(response.text)).variants;
+      return variantSchema.parse(jsonFromAnswer(modelText(response))).variants;
     });
     log('INFO', 'Multi-query variants', { count: variants.length, lengths: variants.map((variant) => variant.length) });
     const vectors = [queryVector, ...await embedRagQuestions(variants.map(embeddingQuery), signal)];

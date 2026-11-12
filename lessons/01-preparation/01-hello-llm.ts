@@ -20,6 +20,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { remoteModel } from '../shared/config.ts';
 import { logInvocation } from '../shared/logging.ts';
+import { printModelStream } from '../shared/stream.ts';
 import { runMain } from '../shared/startup.ts';
 
 async function main() {
@@ -30,16 +31,15 @@ async function main() {
     apiKey: remoteModel.apiKey,
     // Keine automatischen Wiederholungen: Fehler sollen sofort sichtbar werden.
     maxRetries: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 
   await logInvocation('Model', { model: remoteModel.name }, async () => {
     // `stream` liefert Stücke (Chunks), sobald das Modell sie erzeugt, statt auf die ganze Antwort zu warten.
     const stream = await model.stream('Erkläre in zwei Sätzen, was ein Sprachmodell ist.');
-    for await (const chunk of stream) {
-      process.stdout.write(chunk.text);
-    }
-    process.stdout.write('\n');
+    await printModelStream(stream);
   });
 }
 

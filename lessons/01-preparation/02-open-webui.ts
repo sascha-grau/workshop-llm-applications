@@ -37,6 +37,8 @@ async function main() {
     apiKey: remoteModel.apiKey,
     // Keine automatischen Wiederholungen: Fehler sollen sofort im Log und in Open WebUI sichtbar werden.
     maxRetries: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 

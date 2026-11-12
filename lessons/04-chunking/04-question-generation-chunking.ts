@@ -44,7 +44,7 @@
 //      lösche den Index und vergleiche.
 //   3. Ändere `DEMO_QUESTION` in chunking.ts auf eine Frage, die ein Chunk beantwortet, ohne ihre Wörter
 //      zu benutzen. Findet die Suche nach Fragen ihn besser als die Suche nach Chunk-Text (Teil 2)?
-import { stripJsonFence } from '../shared/text.ts';
+import { modelText, stripJsonFence } from '../shared/text.ts';
 import { ChatOpenAI } from '@langchain/openai';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { z } from 'zod';
@@ -85,6 +85,8 @@ async function main() {
     maxRetries: 0,
     disableStreaming: true,
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
     callbacks: [{
       handleLLMEnd: (output) => {
@@ -168,7 +170,7 @@ async function main() {
                   `Bei einer Linkliste frage nach ihren Themen oder Quellen. Antworte ausschließlich mit einem JSON-Objekt im Format ` +
                   `${QUESTION_FORMAT_EXAMPLE}. Alle Fragen müssen auf Deutsch sein.\n\n${text}`,
                 );
-                const answer = response.text.trim();
+                const answer = modelText(response).trim();
                 const json = stripJsonFence(answer);
                 return questionSchema.parse(JSON.parse(json));
               }));

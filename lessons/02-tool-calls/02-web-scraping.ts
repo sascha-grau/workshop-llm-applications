@@ -63,6 +63,8 @@ async function main() {
     maxRetries: 0,
     disableStreaming: true,
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 

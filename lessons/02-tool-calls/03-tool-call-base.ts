@@ -35,7 +35,7 @@ import { toPlainMessages, type PlainMessage } from '../shared/messages.ts';
 import { log, logHttpRequests, logInvocation } from '../shared/logging.ts';
 import { listenWithLogging, logHttpErrors, prepareFacade } from '../shared/server.ts';
 import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
-import { stripThinking } from '../shared/text.ts';
+import { modelText } from '../shared/text.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-02-part-3';
@@ -56,6 +56,8 @@ async function main() {
     // Wiederholungen würden in Burp als verwirrende Doppelanfragen auftauchen: lieber sofort scheitern.
     maxRetries: 0,
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 
@@ -95,7 +97,7 @@ async function main() {
       // Keine Tool-Calls heißt: Das ist die endgültige Antwort.
       const toolCalls = reply.tool_calls ?? [];
       const invalidToolCalls = reply.invalid_tool_calls ?? [];
-      if (toolCalls.length === 0 && invalidToolCalls.length === 0) return reply.text;
+      if (toolCalls.length === 0 && invalidToolCalls.length === 0) return modelText(reply);
 
       log('INFO', 'The model requested tools', {
         round, tools: [...toolCalls, ...invalidToolCalls].map((call) => call.name),
@@ -107,8 +109,9 @@ async function main() {
       // gültige und ungültige Aufrufe gemischt sind: Dann läuft in dieser Runde gar kein Werkzeug, und das
       // Modell versucht es in der nächsten Runde noch einmal.
       if (invalidToolCalls.length) {
-        // Denkschritte (`<think>…</think>`) gehören (außer mit SHOW_THINKING=true) nicht in den Verlauf, den das Modell in der nächsten Runde liest.
-        messages.push({ role: 'assistant', content: stripThinking(reply.text) || '(ungültiger Tool-Aufruf)' });
+        // Denkschritte gehören nicht in den Verlauf, den das Modell in der nächsten Runde liest; `modelText`
+        // lässt sie weg (mit SHOW_THINKING=true bleiben sie drin).
+        messages.push({ role: 'assistant', content: modelText(reply) || '(ungültiger Tool-Aufruf)' });
         messages.push({
           role: 'user',
           content: invalidToolCalls.map((call) =>

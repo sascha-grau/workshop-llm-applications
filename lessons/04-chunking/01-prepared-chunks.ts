@@ -19,9 +19,9 @@
 // steht als `counting_method` in `manifest.json`; dort steht je Chunk auch `token_count`.
 //
 // Das Programm listet die Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true` in chunking.ts
-// die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein, schreibt Text, Metadaten und Vektor
-// in die Indexdatei und durchsucht sie dann: Frage einbetten, mit jedem Chunk vergleichen, die besten
-// drei (`DEFAULT_TOP_K`) anzeigen. Teil 2 schneidet selbst.
+// oder in `.env` die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein, schreibt Text,
+// Metadaten und Vektor in die Indexdatei und durchsucht sie dann: Frage einbetten, mit jedem Chunk
+// vergleichen, die besten drei (`DEFAULT_TOP_K`) anzeigen. Teil 2 schneidet selbst.
 //
 // Neu in dieser Datei sind die gemeinsamen Hilfsfunktionen aus `chunking.ts` (Einbetten, Suche,
 // Ausgabe mit `printHits`, `DEMO_QUESTION`) und die Index-Funktionen aus `shared/index.ts` (Indexdatei
@@ -39,8 +39,8 @@
 //      viele Chunks hat es, und wie viele Zeichen je Token? Mit `ALL_DOCUMENTS = true` (oder
 //      `ALL_DOCUMENTS=true` in `.env`) zeigen Teil 1 bis 3 die Chunk-Tabellen aller Dokumente (nur die
 //      Ausgabe, der Index bleibt gleich). Setze beide Werte danach zurück (`'01-llm01-prompt-injection.md'`
-//      und `false`, den Eintrag in `.env` leere oder entferne): Teil 2 und 3 zeigen ihre Beispielausgabe
-//      mit ihnen, und Teil 4 nutzt `EXAMPLE_DOCUMENT` bei `FULL_CORPUS = false`.
+//      und `false`) und leere oder entferne den Eintrag in `.env`: Teil 2 und 3 zeigen ihre
+//      Beispielausgabe mit ihnen, und Teil 4 nutzt `EXAMPLE_DOCUMENT` bei `FULL_CORPUS = false`.
 //   3. Schau dir die Spalte "characters per token" an: Welche Chunks liegen deutlich unter 4? Was
 //      steht in ihnen (Tipp: Linklisten)? (Nur aussagekräftig, wenn `counting_method` im Manifest
 //      nicht `character-estimate` ist – dann liegt jeder Wert bei etwa 1.)

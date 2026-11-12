@@ -31,7 +31,7 @@
 //      `02-llm02-offenlegung-sensibler-informationen.md`?
 //   3. Ersetze `COLLOQUIAL_QUESTION` durch eine eigene Frage aus dem Fragen-Set von Lektion 05
 //      (`question-set.json`) und entscheide, welche Kombination du für sie einsetzen würdest.
-import { stripJsonFence } from '../shared/text.ts';
+import { modelText, stripJsonFence } from '../shared/text.ts';
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
@@ -83,13 +83,15 @@ async function main() {
     maxRetries: 0,
     disableStreaming: true,
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
     callbacks: [{ handleLLMEnd: (output) => { cost.llmTokens += output.llmOutput?.tokenUsage?.totalTokens ?? 0; } }],
   });
   // Ein Modellaufruf mit JSON-Antwort: Codeblock entfernen, parsen, mit dem Schema prüfen.
   const askForJson = async <T>(prompt: string, schema: z.ZodType<T>): Promise<T> => {
     cost.llmCalls += 1;
-    const answer = (await model.invoke(prompt)).text.trim();
+    const answer = modelText(await model.invoke(prompt)).trim();
     const json = stripJsonFence(answer);
     return schema.parse(JSON.parse(json));
   };

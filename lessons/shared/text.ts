@@ -1,13 +1,48 @@
-// Hilfsfunktionen für Modell-Antworten: `stripThinking` entfernt die Denkschritte von Reasoning-Modellen (alle Lektionen,
-// über `sendChatStream` auch alles, was Open WebUI anzeigt), `stripJsonFence` für Antworten, die JSON liefern sollen
-// (Lektion 04 Teil 4, Lektion 06 und 07, Lektion 08 Teil 2 und 3), und `formatSourceList` samt `stripSourceList`/`withoutSourceLists` für die
-// Quellenliste unter den Antworten (Lektion 02 Teil 1 und 2, Lektion 07).
+// Hilfsfunktionen für Modell-Antworten:
+// - `modelText`/`modelReasoning` holen Antwort und Denkschritte aus einer Modell-Antwort (alle Lektionen mit Chat),
+// - `stripThinking` entfernt `<think>…</think>` aus fertigem Text (über `sendChatStream` auch bei allem, was
+//   Open WebUI anzeigt),
+// - `stripJsonFence` für Antworten, die JSON liefern sollen (Lektion 04 Teil 4, Lektion 06 und 07, Lektion 08
+//   Teil 2 und 3),
+// - `formatSourceList` samt `stripSourceList`/`withoutSourceLists` für die Quellenliste unter den Antworten
+//   (Lektion 02 Teil 1 und 2, Lektion 07).
 import { settings } from './config.ts';
 
+type ReasoningFields = { reasoning?: unknown; reasoning_content?: unknown };
+export type ModelOutput = {
+  text: string;
+  additional_kwargs?: Record<string, unknown>;
+};
+
+// Die Denkschritte einer Modell-Antwort. Der Server schickt sie in einem eigenen Feld (`reasoning`, manche
+// Server: `reasoning_content`), nicht als `<think>` im Text; LangChain verwirft das Feld, deshalb setzen die
+// Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+// Chat-Clients `__includeRawResponse: true`, damit die Rohantwort erhalten bleibt. Ohne Denkschritte: "".
+export function modelReasoning(output: ModelOutput): string {
+  const extra = output.additional_kwargs;
+  const raw = extra?.__raw_response as { choices?: { delta?: ReasoningFields; message?: ReasoningFields }[] } | undefined;
+  const choice = raw?.choices?.[0];
+  for (const fields of [extra, choice?.delta, choice?.message]) {
+    for (const value of [fields?.reasoning_content, fields?.reasoning]) {
+      if (typeof value === 'string' && value) return value;
+    }
+  }
+  return '';
+}
+
+// Die Antwort ohne Denkschritte (ein `<think>`-Block im Text fällt auch weg). Mit SHOW_THINKING=true stehen die
+// Denkschritte stattdessen als `<think>…</think>` vor der Antwort; als JSON gelesene Antworten scheitern dann.
+export function modelText(output: ModelOutput): string {
+  const text = stripThinking(output.text);
+  if (!settings.showThinking) return text;
+  const reasoning = modelReasoning(output);
+  return reasoning ? `<think>${reasoning}</think>${text}` : text;
+}
+
 // Reasoning-Modelle (z. B. qwen3 in LM Studio) schreiben vor die Antwort ihre Denkschritte in einen Block
-// `<think>…</think>`. Die Antwort selbst steht dahinter. Im Workshop zeigen wir nur die Antwort (außer mit SHOW_THINKING=true,
-// dann gibt `stripThinking` den Text unverändert zurück): Die Denkschritte
-// sind lang, oft englisch, würden JSON-Antworten unlesbar machen und gehören nicht in den Chatverlauf.
+// `<think>…</think>`. Die Antwort selbst steht dahinter. Im Workshop zeigen wir nur die Antwort: Die Denkschritte sind
+// lang, oft englisch, würden JSON-Antworten unlesbar machen und gehören nicht in den Chatverlauf. Mit
+// SHOW_THINKING=true gibt `stripThinking` den Text unverändert zurück.
 // Drei Fälle: vollständige Blöcke (überall im Text), ein Block ohne Ende (Antwort abgebrochen, während das Modell
 // noch dachte: Dann bleibt nichts übrig) und ein schließendes `</think>` ohne öffnendes (manche Chat-Vorlagen
 // setzen `<think>` schon in den Prompt; dann ist alles davor Denken). Im dritten Fall endet das Denken am ERSTEN

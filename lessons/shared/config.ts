@@ -66,7 +66,7 @@ export function optionalBooleanEnv(name: string): boolean | undefined {
   const normalized = value.toLowerCase();
   if (['true', '1', 'yes'].includes(normalized)) return true;
   if (['false', '0', 'no'].includes(normalized)) return false;
-  throw new Error(`${name} must be true or false, got "${value}".`);
+  throw new Error(`The setting ${name} in .env must be empty, true or false (also 1/0, yes/no), got "${value}".`);
 }
 
 function validatedURL(name: string, required = true): string | undefined {
@@ -98,6 +98,7 @@ export const remoteEmbeddingModel = {
 };
 
 export const settings = {
+  /** Ob die Denkschritte von Reasoning-Modellen erhalten bleiben (`SHOW_THINKING` in `.env`; Standard: nein). */
   get showThinking(): boolean { return optionalBooleanEnv('SHOW_THINKING') ?? false; },
   /** Adresse des Proxy-Listeners von Burp Suite. Ab Lektion 01, Teil 3 läuft der ausgehende Verkehr darüber, wenn sie gesetzt ist. */
   get burpProxyURL(): string | undefined {

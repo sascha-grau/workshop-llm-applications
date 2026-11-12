@@ -13,7 +13,7 @@ import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { embeddingQuery } from '../shared/embeddings.ts';
 import { indexCommands, rankEntries, type Strategy } from '../shared/index.ts';
 import { contextFor, embedRagQuestion, loadRagIndex, promptFor, retrieveQuestionChunks, type RagEntry } from '../07-rag-open-webui/rag.ts';
-import { stripThinking } from '../shared/text.ts';
+import { modelText } from '../shared/text.ts';
 import { createChatModel } from './evaluation.ts';
 
 // So viele Chunks bilden den Kontext, wie in Teil 2 und 3. Der MRR zählt Ränge bis hierhin.
@@ -61,8 +61,9 @@ export default class RagAssistantProvider implements ApiProvider {
       const context = contextFor(hits);
       const response = await this.model.invoke(promptFor(prompt, [{ role: 'user', content: prompt }], [], context, hits.length));
       return {
-        // Ohne Denkschritte (`<think>…</think>`, außer mit SHOW_THINKING=true): promptfoo prüft nur die Antwort, wie Open WebUI sie zeigt.
-        output: stripThinking(response.text),
+        // Ohne Denkschritte (mit SHOW_THINKING=true stehen sie davor): promptfoo prüft die Antwort, wie
+        // Open WebUI sie zeigt.
+        output: modelText(response),
         metadata: { sources: hits.map(({ metadata }) => metadata.source), context },
       };
     } catch (error) {

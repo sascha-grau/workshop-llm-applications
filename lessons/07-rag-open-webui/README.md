@@ -32,7 +32,9 @@
 
 **The full demo (Part 11):** One facade offers all ten models; you switch the pipeline in the Open WebUI model dropdown instead of restarting. A model whose prerequisites are missing (an index file, Qdrant or the collection) is skipped: the terminal shows a `WARN Skipping unavailable RAG model` line with the reason and the npm script that fixes it (field `fix`). Fix it, restart the demo and reload the model list. If no model is available at all, the start fails. `demo.ts` sets its own values (top-k, child size, lambda, threshold, ...) and does not read the constants of the individual parts, so a change in a part does not carry over to the demo; to experiment there, edit `demo.ts`.
 
-**Only one document in Part 3:** By default, the question index from `l04:4` contains only `01-llm01-prompt-injection.md` (`FULL_CORPUS = false` in `lessons/04-chunking/04-question-generation-chunking.ts`). `l07:3` can therefore only answer questions about prompt injection. For all documents, set `FULL_CORPUS = true` there, run `npm run l04:4` (takes many minutes), and then restart `l07:3`.
+**Only one document in Part 3:** By default (`FULL_CORPUS = true` in `lessons/04-chunking/04-question-generation-chunking.ts`), the question index from `l04:4` covers all documents; the first run of `l04:4` takes many minutes. With `FULL_CORPUS = false` it contains only `01-llm01-prompt-injection.md`, and `l07:3` can then only answer questions about prompt injection; after switching back, run `npm run l04:4` again and restart `l07:3`.
+
+**`SHOW_THINKING`:** With `SHOW_THINKING=true` in `.env`, the model's thinking is put in front of answers that are parsed as JSON: reranking falls back in Part 9, query rewriting fails in Part 10, and Part 11 suffers both; Part 3 finds nothing if the question index in Lesson 04, Part 4 was built with it. Keep it empty or `false` here.
 
 **Sources in the terminal:** For each question, the program writes one `RAG sources` line to the terminal. It shows which file and which heading path (in Part 2 only the file, because semantic chunks have no heading path) are behind the numbers [1] to [N] that the model cites.
 

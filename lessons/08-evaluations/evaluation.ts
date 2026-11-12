@@ -14,11 +14,11 @@
 // - wrapUntrusted, preview: fremden Text in Tags verpacken, Text für die Ausgabe kürzen
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
-import { remoteEmbeddingModel, remoteModel } from '../shared/config.ts';
+import { remoteEmbeddingModel, remoteModel, settings } from '../shared/config.ts';
 import { embeddingQuery } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
 import { embeddings, rankEntries, sectionPath, HEADING_SEPARATOR, type IndexEntry } from '../shared/index.ts';
-import { stripJsonFence, stripThinking } from '../shared/text.ts';
+import { modelText, stripJsonFence } from '../shared/text.ts';
 
 // Antwort und Urteil kommen ohne Streaming, also erst am Ende; ein kleines lokales Modell braucht
 // für den Kontext aus mehreren Chunks seine Zeit. Danach lieber abbrechen als endlos warten.
@@ -87,6 +87,11 @@ export function createChatModel(): ChatOpenAI {
     // 0: dieselbe Eingabe soll möglichst dasselbe Urteil ergeben. Ein Messgerät, das bei jedem Lauf
     // anders anzeigt, misst nichts.
     temperature: 0,
+    // Ohne Denkschritte bitten wir den Server um keine (`reasoning_effort`); mancher Server, auch der
+    // Workshop-Server, ignoriert das, `modelText` lässt sie dann trotzdem weg.
+    modelKwargs: settings.showThinking ? {} : { reasoning_effort: 'none' },
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 }
@@ -119,8 +124,8 @@ export async function answerFromContext(model: ChatOpenAI, context: string, ques
       ['system', ANSWER_SYSTEM_PROMPT],
       ['user', `${wrapUntrusted('retrieved_context', context)}\n\nFrage: ${question}`],
     ]);
-    // Ohne Denkschritte (`<think>…</think>`, außer mit SHOW_THINKING=true): Der Judge soll nur die Antwort prüfen.
-    const text = stripThinking(response.text);
+    // Ohne Denkschritte (mit SHOW_THINKING=true stehen sie davor): Der Judge soll nur die Antwort prüfen.
+    const text = modelText(response);
     if (!text) throw new Error('The chat model returned an empty answer. Check that the model is loaded and try again.');
     return text;
   });
@@ -133,7 +138,7 @@ export async function askJudge(model: ChatOpenAI, systemPrompt: string, userCont
   const response = await model.invoke([['system', systemPrompt], ['user', userContent]]);
   let json: unknown;
   try {
-    json = JSON.parse(stripJsonFence(response.text));
+    json = JSON.parse(stripJsonFence(modelText(response)));
   } catch {
     throw new Error('The judge did not return valid JSON. Expected {"reasoning": "…", "verdict": "yes" | "no"}.');
   }

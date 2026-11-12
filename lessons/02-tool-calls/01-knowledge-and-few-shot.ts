@@ -45,6 +45,8 @@ async function main() {
     disableStreaming: true,
     // NEU: Temperature 0 macht Antworten (fast) wiederholbar, alle Teilnehmenden sehen dasselbe Verhalten.
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 

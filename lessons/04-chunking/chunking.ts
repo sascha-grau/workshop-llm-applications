@@ -36,7 +36,8 @@ export const CHUNK_DIRECTORY = join(contentDirectory, 'owasp-genai-top-10', 'chu
 // Für welche Dokumente Teil 1 bis 3 die Detailausgabe zeigen (Chunk-Tabellen, in Teil 3 auch Abstände
 // und Schnitte): `ALL_DOCUMENTS = false` = nur EXAMPLE_DOCUMENT, true = alle (längere Ausgabe).
 // ALL_DOCUMENTS ändert nur die Ausgabe, nie den Index; EXAMPLE_DOCUMENT wählt zusätzlich das Dokument
-// für Teil 4 bei FULL_CORPUS = false. `ALL_DOCUMENTS=true` in `.env` überschreibt die Konstante, ohne Code zu ändern.
+// für Teil 4 bei FULL_CORPUS = false. Ein Wert für ALL_DOCUMENTS in `.env` (true oder false) überschreibt
+// die Konstante; das Programm meldet das.
 export const EXAMPLE_DOCUMENT = '01-llm01-prompt-injection.md';
 export const ALL_DOCUMENTS = false;
 // Die Ausgabe der OWASP-Liste. Sie gehört zum Korpus, deshalb bekommt jeder Chunk denselben Wert.
@@ -80,9 +81,16 @@ export function sourcesFor(subset: string[] = [], manifest = readManifest()): st
 
 // Die Dokumente für die Detailausgabe: nur EXAMPLE_DOCUMENT, mit ALL_DOCUMENTS alle aus dem Manifest.
 // `scope` (Teil 2: die indizierten Dokumente) grenzt das "alle" ein.
+let reportedAllDocumentsOverride = false;
+
 export function exampleDocuments(manifest = readManifest(), scope?: string[]): string[] {
   const sources = manifest.sources.map(({ file }) => file);
-  if (optionalBooleanEnv('ALL_DOCUMENTS') ?? ALL_DOCUMENTS) return scope ?? sources;
+  const allDocuments = optionalBooleanEnv('ALL_DOCUMENTS');
+  if (allDocuments !== undefined && allDocuments !== ALL_DOCUMENTS && !reportedAllDocumentsOverride) {
+    console.log(`ALL_DOCUMENTS=${allDocuments} from .env (overrides the constant in chunking.ts)`);
+    reportedAllDocumentsOverride = true;
+  }
+  if (allDocuments ?? ALL_DOCUMENTS) return scope ?? sources;
   if (!sources.includes(EXAMPLE_DOCUMENT)) throw new Error(`Unknown EXAMPLE_DOCUMENT: ${EXAMPLE_DOCUMENT}. Check manifest.json.`);
   return [EXAMPLE_DOCUMENT];
 }

@@ -27,6 +27,7 @@ import { toPlainMessages } from '../shared/messages.ts';
 import { log, logHttpRequests, logInvocation } from '../shared/logging.ts';
 import { listenWithLogging, logHttpErrors, prepareFacade } from '../shared/server.ts';
 import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
+import { modelText } from '../shared/text.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-02-part-4';
@@ -50,6 +51,8 @@ async function main() {
     // Wiederholungen würden in Burp als verwirrende Doppelanfragen auftauchen: lieber sofort scheitern.
     maxRetries: 0,
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 
@@ -88,7 +91,8 @@ async function main() {
       const response = await agent.invoke({ messages: toPlainMessages(chatRequest.messages) }, { signal, recursionLimit: 2 * MAX_TOOL_ROUNDS });
 
       // Die letzte Nachricht ist die endgültige Antwort des Modells; die davor sind der Tool-Durchlauf.
-      const answer = response.messages.at(-1)?.text;
+      const message = response.messages.at(-1);
+      const answer = message ? modelText(message) : '';
       if (!answer) throw new Error('The model returned no answer text.');
 
       // Der Agent streamt nicht, also senden wir die fertige Antwort als Ollama-Stream aus einem Teil.

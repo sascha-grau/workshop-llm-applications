@@ -42,7 +42,7 @@
 //   2. Setze `TEXT_LIMIT` auf 150 und danach auf 1500. Wie ändern sich die Zahlen, die Tokens und die
 //      Zeit?
 //   3. Ändere `QUESTION` in "PoisonGPT". Hilft das Reranking bei einer Frage aus nur einem Wort?
-import { stripJsonFence } from '../shared/text.ts';
+import { modelText, stripJsonFence } from '../shared/text.ts';
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
@@ -92,6 +92,8 @@ async function main() {
     disableStreaming: true,
     // 0: dieselbe Frage und derselbe Chunk sollen möglichst dieselbe Zahl ergeben.
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
     callbacks: [{ handleLLMEnd: (output) => { llmTokens += output.llmOutput?.tokenUsage?.totalTokens ?? 0; } }],
   });
@@ -126,7 +128,7 @@ async function main() {
           'Antworte ausschließlich mit einem JSON-Objekt im Format {"score": 7}.\n\n' +
           `Frage: ${QUESTION}\n\nAbschnitt:\n${(hit.payload as { text: string }).text.slice(0, TEXT_LIMIT)}`,
         );
-        const answer = response.text.trim();
+        const answer = modelText(response).trim();
         const json = stripJsonFence(answer);
         return ratingSchema.parse(JSON.parse(json)).score;
       }).catch(() => undefined);

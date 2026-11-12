@@ -19,14 +19,14 @@
 // lade bei Bedarf die Modellliste neu.
 //
 // Voraussetzungen: wie Teil 1, aber mit dem Index aus Lektion 04, Teil 4 (erst `npm run l04:0`,
-// dann `npm run l04:4`). Dieser Index wird mit dem Chat-Modell erzeugt und ist standardmäßig nur
-// für das Beispieldokument gefüllt (FULL_CORPUS in Lektion 04, Teil 4); Fragen zu anderen Dokumenten finden
-// dann nichts. Burp ist optional.
+// dann `npm run l04:4`). Dieser Index wird mit dem Chat-Modell erzeugt und deckt standardmäßig den
+// ganzen Korpus ab (FULL_CORPUS = true in Lektion 04, Teil 4); mit false enthält er nur `EXAMPLE_DOCUMENT`,
+// und Fragen zu anderen Dokumenten finden dann nichts. Burp ist optional.
 // Start: npm run l07:3
 //
 // Aufgabe:
 //   1. Stelle dieselbe Frage wie in Teil 1 und 2. Welche Quellen kommen, und wie wirkt sich der
-//      kleinere Index (nur ein Dokument) aus? (Im Terminal zeigt die Zeile `RAG sources`, was [1] bis [N] sind.)
+//      andere Index (Fragen statt Chunk-Text) aus? (Im Terminal zeigt die Zeile `RAG sources`, was [1] bis [N] sind.)
 //   2. Formuliere eine Frage in ganz anderen Worten als der Chunk-Text. Findet Teil 3 den Chunk
 //      besser als Teil 1?
 //   3. Ändere `TOP_K` auf 1 und vergleiche die Antwort mit der von Teil 1 bei derselben Einstellung.

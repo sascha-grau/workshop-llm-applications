@@ -53,6 +53,8 @@ async function main() {
     maxRetries: 0,
     // NEU: Eine vollständige Antwort ist in Burp viel leichter zu lesen als viele kleine Stücke.
     disableStreaming: true,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 
@@ -66,7 +68,7 @@ async function main() {
     await logInvocation('Model', { messages: chatRequest.messages.length }, async () => {
       // `invoke` wartet auf die ganze Antwort; `.text` ist ihr Text.
       const response = await chatModel.invoke(toPlainMessages(chatRequest.messages), { signal });
-      await sendChatStream(chatResponse, response.text, signal);
+      await sendChatStream(chatResponse, response, signal);
     });
   });
 

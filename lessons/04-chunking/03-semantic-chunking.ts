@@ -30,8 +30,8 @@
 // Index schreiben).
 //
 // Das Programm zeigt die Abstände und Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true`
-// in chunking.ts die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein, schreibt Text,
-// Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
+// in chunking.ts oder in `.env` die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein,
+// schreibt Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
 //
 // Das Finden der Schnitte kostet eine eigene Runde Embeddings zusätzlich zu der für die fertigen
 // Chunks, aber noch immer keinen Sprachmodell-Aufruf. Das Programm gibt die Zahl der

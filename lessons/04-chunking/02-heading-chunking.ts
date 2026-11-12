@@ -14,9 +14,9 @@
 // Preis: Ein Abschnitt, den Teil 0 auf zwei vorbereitete Chunks verteilen musste, bleibt auch
 // hier zwei Chunks.
 //
-// Das Programm zeigt die Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true` in
-// chunking.ts die aller indizierten Dokumente; nur die Ausgabe), bettet den Korpus ein, schreibt Text,
-// Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
+// Das Programm zeigt die Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true` in chunking.ts
+// oder in `.env` die aller indizierten Dokumente; nur die Ausgabe), bettet den Korpus ein, schreibt
+// Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
 //
 // Vergleiche die drei Treffer mit denen aus Teil 1: Ein vorbereiteter Chunk füllt das Token-Limit
 // und mischt mehrere Abschnitte, sein Vektor ist ein Mittelwert aus allen. Ein Chunk mit genau

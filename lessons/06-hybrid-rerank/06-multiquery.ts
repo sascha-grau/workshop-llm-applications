@@ -34,7 +34,7 @@
 //   2. Vergleiche die Spalten: Wie viele Treffer stammen in jeder Spalte aus
 //      `02-llm02-offenlegung-sensibler-informationen.md`, und welche Treffer finden alle Listen?
 //   3. Setze `VARIANT_COUNT` auf 1 und danach auf 5. Lohnen sich mehr Fassungen, gemessen an der Zeit?
-import { stripJsonFence } from '../shared/text.ts';
+import { modelText, stripJsonFence } from '../shared/text.ts';
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
@@ -78,6 +78,8 @@ async function main() {
     maxRetries: 0,
     disableStreaming: true,
     temperature: 0,
+    // Rohantwort behalten: enthält die Denkschritte (siehe shared/text.ts)
+    __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 
@@ -94,7 +96,7 @@ async function main() {
         `Antworte ausschließlich mit einem JSON-Objekt im Format {"variants": ["…", "…"]} mit genau ${VARIANT_COUNT} Einträgen. ` +
         `Frage: ${QUESTION}`,
       );
-      const answer = response.text.trim();
+      const answer = modelText(response).trim();
       const json = stripJsonFence(answer);
       return variantSchema.parse(JSON.parse(json)).variants;
     });
