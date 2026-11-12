@@ -99,12 +99,25 @@ export function createChatModel(): ChatOpenAI {
 // Sucht wie in Lektion 05, Teil 1, zeigt die Treffer und liefert den Kontext-Text: je Treffer eine
 // Zeile "[Datei › Abschnitt]", darunter der Chunk-Text. Antwort und Judge bekommen genau diesen Text.
 // In den Log-Details stehen nur Metadaten, nie die Frage.
-export async function retrieveContext(index: IndexEntry[], question: string, topK: number): Promise<string> {
+// Mit `expandSections` kommen zu den Top-k-Treffern alle Unterabschnitte desselben Dokuments hinzu (gleicher
+// Überschriftenpfad plus weitere Ebenen), z. B. 5 Treffer → 9 Chunks. Teil 3 braucht das: Die Listenpunkte
+// einer Antwort stehen oft in den Unterabschnitten, und sonst wäre die Antwort wirklich unvollständig.
+export async function retrieveContext(
+  index: IndexEntry[], question: string, topK: number, { expandSections = false }: { expandSections?: boolean } = {},
+): Promise<string> {
   const hits = await logInvocation('Search', { model: remoteEmbeddingModel.name, topK }, async () => {
     const queryVector = await embeddings.embedQuery(embeddingQuery(question));
-    return rankEntries(index, queryVector, topK);
+    const ranked = rankEntries(index, queryVector, index.length);
+    const parents = ranked.slice(0, topK);
+    return ranked.filter(({ metadata: candidate }, position) => position < topK || expandSections && parents.some(({ metadata: parent }) =>
+      parent.source === candidate.source && parent.headingPath?.length
+      && (candidate.headingPath?.length ?? 0) > parent.headingPath.length
+      && parent.headingPath.every((heading, level) => candidate.headingPath?.[level] === heading),
+    ));
   });
-  console.log(`Context: top ${hits.length} for “${question}”:`);
+  console.log(expandSections
+    ? `Context: top ${topK} expanded to ${hits.length} chunks for “${question}”:`
+    : `Context: top ${hits.length} for “${question}”:`);
   console.table(hits.map(({ metadata, similarity }, position) => ({
     rank: position + 1,
     similarity: similarity.toFixed(3),
@@ -114,6 +127,31 @@ export async function retrieveContext(index: IndexEntry[], question: string, top
   return hits
     .map(({ metadata, text }) => `[${metadata.source}${HEADING_SEPARATOR}${sectionPath(metadata.headingPath)}]\n${text}`)
     .join('\n\n');
+}
+
+export class JudgeFormatError extends Error {}
+
+export async function askJudgeJson<T>(
+  model: Pick<ChatOpenAI, 'invoke'>, systemPrompt: string, userContent: string, schema: z.ZodType<T>,
+): Promise<T> {
+  const response = await model.invoke([['system', systemPrompt], ['user', userContent]]);
+  if (response.response_metadata?.finish_reason === 'length') {
+    throw new JudgeFormatError('The judge response was truncated. Increase its output token limit.');
+  }
+  const text = modelText(response);
+  if (!text.trim()) throw new JudgeFormatError('The judge returned an empty answer.');
+  let json: unknown;
+  try {
+    json = JSON.parse(stripJsonFence(text));
+  } catch {
+    throw new JudgeFormatError('The judge did not return valid JSON.');
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map(({ path, message }) => `${path.join('.') || 'object'}: ${message}`).join('; ');
+    throw new JudgeFormatError(`The judge JSON has an unexpected shape (${fields}).`);
+  }
+  return parsed.data;
 }
 
 // Beantwortet die Frage nur aus dem Kontext. Der Kontext steht in Tags in der Nutzernachricht, die
@@ -135,19 +173,7 @@ export async function answerFromContext(model: ChatOpenAI, context: string, ques
 // `userContent` sind die Daten. Die Fehlermeldungen zitieren die Antwort des Modells absichtlich
 // nicht (Regel in shared/logging.ts); die rohe Antwort zeigt Burp.
 export async function askJudge(model: ChatOpenAI, systemPrompt: string, userContent: string): Promise<Verdict> {
-  const response = await model.invoke([['system', systemPrompt], ['user', userContent]]);
-  let json: unknown;
-  try {
-    json = JSON.parse(stripJsonFence(modelText(response)));
-  } catch {
-    throw new Error('The judge did not return valid JSON. Expected {"reasoning": "…", "verdict": "yes" | "no"}.');
-  }
-  const parsed = verdictSchema.safeParse(json);
-  if (!parsed.success) {
-    const fields = parsed.error.issues.map(({ path }) => path.join('.') || 'object').join(', ');
-    throw new Error(`The judge JSON has an unexpected shape (${fields}). Expected {"reasoning": "…", "verdict": "yes" | "no"}.`);
-  }
-  return parsed.data;
+  return askJudgeJson(model, systemPrompt, userContent, verdictSchema);
 }
 
 // Lässt den Judge einen Fall prüfen und gibt Antwort, Urteil und Begründung aus. `label` nennt den
@@ -159,11 +185,11 @@ export async function judgeAndPrint(
   text: string,
   judge: (text: string) => Promise<Verdict>,
 ): Promise<Verdict['verdict'] | undefined> {
-  console.log(`\n${label}: ${preview(text)}`);
+  console.log(`\n${label}: ${text}`);
   try {
     // Das Label des Falls ist Metadatum; Antwort und Begründung stehen nur in der Ausgabe, nie im Log.
     const { reasoning, verdict } = await logInvocation('Judge', { model: remoteModel.name, case: label }, () => judge(text));
-    console.log(`  ${criterion}: ${verdict} – ${preview(reasoning)}`);
+    console.log(`  ${criterion}: ${verdict} – ${reasoning}`);
     return verdict;
   } catch {
     // Ein unbrauchbares Urteil ist schon protokolliert. Der andere Fall läuft trotzdem, damit du
@@ -184,11 +210,11 @@ export function reportJudgeCheck(realVerdict: Verdict['verdict'] | undefined, co
   } else if (realVerdict === 'yes' && controlVerdict === 'no') {
     console.log(`\nJudge check passed: the judge accepted the real answer and rejected the ${controlLabel}.`);
   } else {
-    // Ein "no" für die echte Antwort kann auch stimmen (das Modell hat sich geirrt). Welcher Fall
-    // vorliegt, zeigt nur die Begründung; verlassen kannst du dich auf diesen Lauf nicht.
+    // Ein "no" für die echte Antwort kann stimmen (die Antwort ist unvollständig) oder ein Irrtum des Judge
+    // sein. Welcher Fall vorliegt, zeigt nur die Begründung; die Meldung unten nennt beide Möglichkeiten.
     console.log(
       `\nJudge check FAILED: expected "yes" for the real answer and "no" for the ${controlLabel}, got "${realVerdict}" and "${controlVerdict}". ` +
-      'The judge is not trustworthy in this run; read both reasonings.',
+      'The generated answer may be incomplete or the judge may be wrong; read both reasonings.',
     );
   }
 }

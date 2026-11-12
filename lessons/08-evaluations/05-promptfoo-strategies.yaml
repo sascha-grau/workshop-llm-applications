@@ -13,11 +13,14 @@
 #      Pipeline aus Lektion 07). Nur der Index wechselt (`config.strategy`).
 #   2. Testfälle: die Fragen aus dem Fragen-Set von Lektion 05 außer F-11 (`promptfoo-testcases.ts`).
 #   3. Prüfungen je Antwort (`defaultTest.assert`): Quellentreffer und MRR ohne Sprachmodell aus den
-#      Metadaten des Providers, Quellentreue und Korrektheit mit einem Judge.
+#      Metadaten des Providers, Quellentreue (eigene Prüfung `promptfoo-faithfulness.ts`) und
+#      Korrektheit (`llm-rubric`) mit einem Judge.
 #
 # KERN: Die Prüfungen messen dasselbe wie Teil 1 bis 3. `source-hit` ist die Trefferquote, `mrr`
 # der MRR (der Mittelwert je Spalte), `faithful` die Quellentreue (wie RAGAS: Antwort in Aussagen
 # zerlegen, jede gegen den Kontext prüfen), `correct` die Korrektheit gegen die Kernaussage.
+# Ein ERROR in einer Zelle ("judge format error") heißt: Der Judge hat das JSON-Format nicht eingehalten.
+# Das ist etwas anderes als ein FAIL (die Antwort enthält nicht gedeckte Aussagen).
 #
 # Merke: Der Fragen-Index (Lektion 04, Teil 4) deckt mit `FULL_CORPUS = true` (Standard) den ganzen
 # Korpus ab; alle Fragen gehen deshalb an alle vier Provider. Hast du dort `FULL_CORPUS = false` gesetzt,
@@ -36,16 +39,18 @@
 #        wählen und F5 drücken ("Run current file" ist nur für .ts-Dateien; der Bericht heißt gleich)
 #        npx promptfoo view   (Ergebnisse als Web-App mit Mittelwert je Spalte, für die Aufgaben; lauscht
 #        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
-# Dauer: gemessen rund 30 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
-# (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 20 Minuten, auf langsamer Hardware länger.
+# Dauer: gemessen rund 35 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
+# (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 25 Minuten, auf langsamer Hardware länger.
 # Strg+C hält an; `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed …
 # shutting down" nach Strg+C heißen nur: Diese Urteile wurden abgebrochen.
+# Zellen mit ERROR ("judge format error") lassen das Skript mit Exit-Code 100 enden und "Assertion grading
+# failed during eval" samt Stacktrace ausgeben; das ist kein Absturz, Ergebnisse und Bericht werden geschrieben.
 #
 # Aufgabe:
 #   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).
 #      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
 #      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
-#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote ist in allen Spalten gleich, nur F-05
+#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in allen Spalten bei etwa 0,9, nur F-05
 #      fehlt; die Unterschiede im MRR sind klein, mit elf Fragen gibt es keinen klaren Sieger.)
 #   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
 #      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
@@ -78,6 +83,8 @@ tests:
   path: file://promptfoo-testcases.ts
 
 defaultTest:
+  # Hängt die Begründung jeder Prüfung an die Zelle, damit der HTML-Bericht sie zeigt (`promptfoo-scores.ts`).
+  assertScoringFunction: file://promptfoo-scores.ts
   options:
     # Der Judge: das Chat-Modell aus `.env` über die OpenAI-kompatible API von LM Studio. Ohne diese
     # Angabe würde promptfoo OpenAI in der Cloud fragen. Ein stärkeres Modell? Nur die Werte ändern.
@@ -100,8 +107,7 @@ defaultTest:
         # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte; `promptfoo-judge.ts` bittet per
         # `reasoning_effort: none` darum und verbirgt sie (ein Server darf die Bitte ignorieren, das Limit muss
         # sie dann mit abdecken). Mit ihnen schrieb qwen3.5-4b vor jedem Urteil rund 2500 Tokens, stieß an die
-        # Grenze und lieferte gar keine Antwort (promptfoo meldet dann "context-faithfulness produced malformed
-        # response").
+        # Grenze und lieferte gar keine Antwort (das Urteil schlägt dann mit einem Formatfehler fehl).
         max_tokens: 2048
   assert:
     # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die
@@ -118,15 +124,16 @@ defaultTest:
         const sources = context.providerResponse?.metadata?.sources ?? [];
         const rank = sources.findIndex((source) => expected.includes(source)) + 1;
         return rank > 0 ? 1 / rank : 0;
-    # Quellentreue (Teil 2), wie RAGAS (ein verbreitetes Evaluierungs-Framework für RAG): Antwort in
-    # Aussagen zerlegen, jede gegen den Kontext prüfen. Schwelle 1 heißt: jede Aussage gedeckt. Das ist
-    # bewusst streng; mit einem kleinen Judge scheitern daran viele Zeilen. Lies deshalb den Mittelwert
-    # der Metrik `faithful`, nicht nur bestanden/nicht bestanden. "Could not parse context-faithfulness
-    # verdicts" heißt: Der Judge hat das Antwortformat nicht eingehalten (zählt als 0); das passiert
-    # mit kleinen Modellen. Der Kontext kommt aus den Metadaten des Providers.
-    - type: context-faithfulness
+    # Quellentreue (Teil 2), wie RAGAS (ein verbreitetes Evaluierungs-Framework für RAG): eine eigene
+    # Prüfung (`promptfoo-faithfulness.ts`, in zwei Schritten). Erst zerlegt der Judge die Antwort in
+    # Aussagen, dann markiert er jede als gedeckt oder nicht gedeckt, jeweils mit streng geprüftem JSON.
+    # Der Wert ist gedeckt / alle Aussagen; Schwelle 1 heißt: jede Aussage gedeckt. Das ist bewusst
+    # streng, lies deshalb den Mittelwert der Metrik `faithful`, nicht nur bestanden/nicht bestanden.
+    # Hält der Judge das Format auch nach einem zweiten Versuch nicht ein, zeigt die Zelle ERROR
+    # ("judge format error"), kein FAIL. Der Kontext kommt aus den Metadaten des Providers.
+    - type: javascript
       metric: faithful
-      contextTransform: context.metadata.context
+      value: file://promptfoo-faithfulness.ts
       threshold: 1
     # Korrektheit (Teil 3): Die Rubrik ist der Prompt des Judge. Dieselbe Rubrik steht in Teil 6;
     # änderst du sie, ändere beide, sonst sind die Spalten nicht vergleichbar. Der zweite Satz ist Absicht:

@@ -10,7 +10,10 @@
 // Der Judge sieht hier keinen Kontext, nur Frage, Kernaussage und Antwort. Schritte:
 //   1. Index und Frage laden: der Überschriften-Index aus Lektion 04, Teil 2, nur öffentliche
 //      Chunks (`loadPublicIndex`), und die Frage `QUESTION_ID` aus dem Fragen-Set von Lektion 05.
-//   2. Suchen: wie in Teil 2, die besten `TOP_K` Chunks bilden den Kontext.
+//   2. Suchen: wie in Teil 2, aber jeder gefundene Abschnitt wird um seine Unterabschnitte aus demselben
+//      Dokument erweitert (`expandSections`): Die Aufzählungen stehen oft dort, nicht im Treffer selbst
+//      (Idee des Parent-Document-Retrievers, Lektion 04, Teil 5). Die besten `TOP_K` Chunks plus ihre
+//      Unterabschnitte bilden den Kontext.
 //   3. Antworten: Das Chat-Modell beantwortet die Frage nur aus dem Kontext, wie in Teil 2.
 //   4. Urteilen: Der Judge vergleicht die Antwort mit der Kernaussage und antwortet mit JSON, erst
 //      `reasoning` (Begründung), dann `verdict` ("yes" oder "no").
@@ -42,10 +45,10 @@
 //
 // Aufgabe:
 //   1. Lies Kernaussage, Antwort und beide Urteile. Welche Punkte der Kernaussage nennt die
-//      Antwort, welche fehlen? Lehnt der Judge `HONEST_NO` ab (`correct: no`)? (Gemessen mit
-//      einem 4B-Modell: `Judge check FAILED` – die echte Antwort nennt nur 3 von 7 Maßnahmen, der Judge
-//      sagt deshalb `no`; `HONEST_NO` lehnt er richtig ab. Mit einem stärkeren Modell oder einer
-//      vollständigen Antwort: `yes`/`no`, `Judge check passed`. Lies beide Begründungen.)
+//      Antwort, welche fehlen? Lehnt der Judge `HONEST_NO` ab (`correct: no`)? (Erwartung:
+//      `yes` für die echte Antwort, `no` für `HONEST_NO`, am Ende `Judge check passed`. Ohne die
+//      Erweiterung der Abschnitte enthielten die fünf Treffer nur 3 der 7 Maßnahmen von F-01; die Antwort
+//      war dann wirklich unvollständig, und der Judge sagte zu Recht `no`. Lies beide Begründungen.)
 //   2. Setze `QUESTION_ID` auf eine Frage, bei der Teil 1 (`npm run l08:1`) Rang 0 zeigt, also
 //      kein erwartetes Dokument in den Top-k findet. Was urteilt der Judge jetzt über die echte
 //      Antwort, und woran liegt der Fehler: an der Suche oder am Modell? (Zeigt keine Frage Rang 0,
@@ -64,7 +67,8 @@ import { runMain } from '../shared/startup.ts';
 // Die Frage aus `question-set.json` (Lektion 05), deren Antwort geprüft wird. F-01 ist dieselbe
 // Frage wie in Teil 2, so lassen sich beide Urteile vergleichen.
 const QUESTION_ID = 'F-01';
-// Wie viele Chunks den Kontext für die Antwort bilden, wie in Teil 2.
+// Wie viele Treffer die Suche liefert, wie in Teil 2. Dazu kommen ihre Unterabschnitte
+// (siehe `expandSections`).
 const TOP_K = 5;
 // Gegenprobe: ehrlich, aber nutzlos. Diese Antwort behauptet nichts und ist damit quellentreu (Teil 2
 // würde "yes" sagen), aber sie enthält die Kernaussage nicht. Ein Korrektheits-Judge muss sie ablehnen.
@@ -104,8 +108,9 @@ async function main() {
   await checkModelServer({ viaBurp: true });
 
   try {
-    // Schritt 2 und 3: Suchen und antworten, wie in Teil 2.
-    const context = await retrieveContext(index, testQuestion.question, TOP_K);
+    // Schritt 2 und 3: Suchen (mit den Unterabschnitten der Treffer, sonst fehlen Teile der Aufzählung
+    // in F-01) und antworten, wie in Teil 2.
+    const context = await retrieveContext(index, testQuestion.question, TOP_K, { expandSections: true });
     const answer = await answerFromContext(model, context, testQuestion.question);
 
     // NEU: Schritt 4 und 5: Urteilen, erst die echte Antwort, dann die Gegenprobe. Der Judge bekommt
