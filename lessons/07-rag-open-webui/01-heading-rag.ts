@@ -50,9 +50,10 @@
 // Aufgabe:
 //   1. Stelle in Open WebUI eine Frage, die die Dokumente nicht beantworten können (z. B. "Wie
 //      wird das Wetter morgen?"). Was antwortet das Modell, und welche Quellen zitiert es?
-//      (Im Terminal zeigt die Zeile `RAG sources`, was [1] bis [N] sind.) Aus Lektion 05, Teil 4
-//      weißt du: Top-k liefert auch hier TOP_K Chunks, die nicht passen. Sagt das Modell trotzdem
-//      offen, dass die Quellen nichts hergeben?
+//      Vergleiche die `[n]` im Antworttext mit der angehängten Liste. (Im Terminal zeigt die
+//      Zeile `RAG sources`, was [1] bis [N] sind.) Aus Lektion 05, Teil 4 weißt du: Top-k liefert
+//      auch hier TOP_K Chunks, die nicht passen. Sagt das Modell trotzdem offen, dass die Quellen
+//      nichts hergeben?
 //   2. In Lektion 05, Teil 1 hast du gesehen, welche Chunks k = 1 und k = 8 liefern. Ändere hier
 //      `TOP_K` auf 1 und auf 8 und stelle jeweils die Frage "Wie begrenze ich Prompt Injection?".
 //      Was macht das Modell daraus: Wie ändern sich Vollständigkeit, Länge und Dauer der Antwort,

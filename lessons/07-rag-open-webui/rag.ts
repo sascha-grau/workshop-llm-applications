@@ -6,6 +6,7 @@
 // `startRag` startet sie. Die Suchfunktionen der einzelnen Strategien stehen in `retrieval.ts`
 // (im Speicher), `parent-document.ts` und `qdrant-retrieval.ts` (Qdrant). Jede Antwort endet mit einer vom Code
 // angehängten Quellenliste (`formatSourceList`, `footer` in `sendChatStream`); das Modell zitiert nur mit [n].
+// Frühere Antworten gehen ohne diese Liste ans Modell (`withoutSourceLists`).
 import express from 'express';
 import { ChatOpenAI } from '@langchain/openai';
 import { createOllamaApiFacade } from 'ollama-api-facade-js';
@@ -21,7 +22,7 @@ import {
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { listenWithLogging, logHttpErrors, prepareFacade } from '../shared/server.ts';
 import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
-import { formatSourceList } from '../shared/text.ts';
+import { formatSourceList, withoutSourceLists } from '../shared/text.ts';
 import {
   embeddings, readIndex, rankEntries, uniqueChunks,
   type IndexEntry, type QuestionEntry, type Strategy, indexLoadError, isPublicChunk, HEADING_SEPARATOR,
@@ -171,13 +172,15 @@ export function promptFor(
   sourceCount: number,
 ): PlainMessage[] {
   // Anfrage ans Modell: System-Prompt (plus die von Open WebUI), der bisherige Verlauf ohne
-  // die letzte Frage, dann die Frage mit dem Kontext in <retrieved_context>-Tags abgegrenzt.
+  // die letzte Frage, dann die Frage mit dem Kontext in <retrieved_context>-Tags abgegrenzt. Jedes `<` im
+  // Kontext wird zu `‹`: So kann ein Dokument den Block nicht selbst mit "</retrieved_context>" schließen
+  // und den Rest wie eine Anweisung aussehen lassen (wie `wrapUntrusted` in Lektion 08).
   // Achtung: Diese System-Prompts kommen vom Client und sind nicht vertrauenswürdig. Hier ist das in Ordnung, weil du selbst der Nutzer bist.
   // In einer Mehrbenutzer-Anwendung würdest du sie verwerfen; Zugriffsschutz darf nie vom Prompt abhängen.
   return [
     { role: 'system', content: [systemPromptFor(sourceCount), ...systemPrompts].join('\n\n') },
-    ...messages.slice(0, messages.findLastIndex(({ role }) => role === 'user')),
-    { role: 'user', content: `<retrieved_context>\n${context}\n</retrieved_context>\n\nFrage: ${question}` },
+    ...withoutSourceLists(messages.slice(0, messages.findLastIndex(({ role }) => role === 'user'))),
+    { role: 'user', content: `<retrieved_context>\n${context.replaceAll('<', '‹')}\n</retrieved_context>\n\nFrage: ${question}` },
   ];
 }
 
@@ -273,7 +276,7 @@ export function createRagApp(models: RagModel[], model: ChatOpenAI | Parameters<
         // Die System-Prompts vom Client sind nicht vertrauenswürdig (siehe Hinweis bei `promptFor`).
         const stream = await chatModel.stream([
           { role: 'system', content: [taskSystemPrompt, ...systemPrompts].join('\n\n') },
-          ...messages,
+          ...withoutSourceLists(messages),
         ], { signal });
         await sendChatStream(chatResponse, stream, signal);
         return;

@@ -1,4 +1,4 @@
-// Baut die Modelle für Teil 11 (`11-full-demo.ts`): alle zehn Pipelines aus Teil 1 bis 10 in einer
+// Baut die Modelle für Teil 11 (`99-full-demo.ts`): alle zehn Pipelines aus Teil 1 bis 10 in einer
 // Fassade. Die Werte (TOP_K, `CHILD_SIZE`, `LAMBDA`, Schwellenwert usw.) stehen hier noch einmal
 // als nackte Zahlen; sie sind eine Kopie der Konstanten aus den Teilen und folgen deren
 // Änderungen nicht. Ändert sich ein Wert in einem Teil, muss er hier nachgezogen werden, und
