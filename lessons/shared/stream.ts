@@ -7,12 +7,66 @@
  * verwirft Stücke, die nur aus Leerraum bestehen (z. B. "\n\n"), und würde so die Absätze einer
  * Antwort zusammenschieben. `source` ist ein fertiger Text (wird in einem Stück gesendet) oder
  * ein Modell-Stream (wird Stück für Stück gesendet). Mit `options.footer` hängt die Funktion nach der
- * Antwort noch einen festen Text an (die Quellenliste der RAG-Lektionen).
+ * Antwort noch einen festen Text an (die Quellenliste der Lektionen 02 und 07). Denkschritte von
+ * Reasoning-Modellen (`<think>…</think>`) entfernt sie vorher, in beiden Fällen (`withoutThinking`).
  */
 import type { Response } from 'express';
 import type { ChatHandler } from 'ollama-api-facade-js';
 import { EXPECTED_FACADE_VERSION, facadeVersion } from './facade.ts';
 import { abortable } from './abort.ts';
+import { stripThinking } from './text.ts';
+
+const THINK_OPEN = '<think>';
+const THINK_CLOSE = '</think>';
+
+// Entfernt Denkschritte (`<think>…</think>`, siehe `stripThinking` in text.ts) aus einem Modell-Stream, ohne
+// das Streaming aufzugeben. Die Schwierigkeit: Ein Tag kann über zwei Stücke verteilt ankommen ("<thi" und
+// "nk>"). Deshalb hält die Funktion das Ende eines Stücks zurück, solange es der Anfang eines Tags sein
+// könnte, und gibt es erst mit dem nächsten Stück weiter. Innerhalb eines Blocks wird nichts ausgegeben.
+// Leerraum vor dem ersten sichtbaren Text fällt weg: Modelle schreiben nach `</think>` meist "\n\n".
+// Grenze: Setzt die Chat-Vorlage `<think>` schon in den Prompt, kommt nur `</think>` an. Was davor stand, ist dann
+// bereits gesendet: Ein Stream kann nicht zurücknehmen. `stripThinking` (fertiger Text) erkennt diesen Fall.
+export async function* withoutThinking(chunks: AsyncIterable<{ text: string }>): AsyncGenerator<{ text: string }> {
+  let pending = ''; // empfangen, aber noch nicht entschieden
+  let thinking = false; // gerade innerhalb von <think>…</think>?
+  let started = false; // schon sichtbaren Text ausgegeben?
+  const emit = (text: string) => {
+    const visible = started ? text : text.trimStart();
+    if (visible) started = true;
+    return visible;
+  };
+  for await (const { text } of chunks) {
+    pending += text;
+    let output = '';
+    for (;;) {
+      const tag = thinking ? THINK_CLOSE : THINK_OPEN;
+      const position = pending.toLowerCase().indexOf(tag);
+      if (position === -1) {
+        // Kein vollständiges Tag: alles bis auf einen möglichen Tag-Anfang am Ende entscheiden.
+        const keep = partialTagLength(pending, tag);
+        if (!thinking) output += pending.slice(0, pending.length - keep);
+        pending = pending.slice(pending.length - keep);
+        break;
+      }
+      if (!thinking) output += pending.slice(0, position);
+      pending = pending.slice(position + tag.length);
+      thinking = !thinking;
+    }
+    const visible = emit(output);
+    if (visible) yield { text: visible };
+  }
+  // Am Ende: Ein zurückgehaltener Rest außerhalb eines Blocks war doch kein Tag; ein offener Block fällt weg.
+  const rest = thinking ? '' : emit(pending);
+  if (rest) yield { text: rest };
+}
+
+// Wie viele Zeichen am Ende von `text` der Anfang von `tag` sein könnten (z. B. "<thi" für "<think>").
+function partialTagLength(text: string, tag: string): number {
+  for (let length = Math.min(tag.length - 1, text.length); length > 0; length--) {
+    if (tag.startsWith(text.slice(-length).toLowerCase())) return length;
+  }
+  return 0;
+}
 
 // Die Fassade gibt keinen öffentlichen Zugriff auf die rohe Express-Antwort, die wir für den Stream
 // brauchen. Deshalb liest `rawResponse` das private Feld `response` (in ChatResponse.d.ts als private
@@ -93,10 +147,13 @@ export async function sendChatStream(
       }
     }
   }
+  // Denkschritte erreichen Open WebUI weder im fertigen Text noch im Stream. Einzige Lücke im Stream: ein
+  // `</think>` ohne öffnendes Tag (siehe `withoutThinking`); der fertige Text deckt auch diesen Fall ab.
   if (typeof source === 'string') {
-    await write(source);
+    const answer = stripThinking(source);
+    if (answer) await write(answer);
   } else {
-    for await (const chunk of source) await write(chunk.text);
+    for await (const chunk of withoutThinking(source)) await write(chunk.text);
   }
   if (options.footer) await write(options.footer);
   signal.throwIfAborted();

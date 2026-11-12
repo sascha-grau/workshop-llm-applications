@@ -27,7 +27,7 @@ import { isOpenWebUITask, splitSystemPrompts, toPlainMessages } from '../shared/
 import { logHttpRequests, logInvocation } from '../shared/logging.ts';
 import { listenWithLogging, logHttpErrors, prepareFacade } from '../shared/server.ts';
 import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
-import { formatSourceList } from '../shared/text.ts';
+import { formatSourceList, withoutSourceLists } from '../shared/text.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-02-part-1';
@@ -56,7 +56,7 @@ Ano Nym veröffentlicht Berichte nur unter diesem Pseudonym und tritt nie persö
   // NEU: System-Prompt. Die Beschränkung auf den Kontext und die erlaubte Antwort "weiß ich nicht"
   // halten das Modell davon ab, Fakten zu erfinden.
   const systemPrompt = `Beantworte Fragen ausschließlich mit dem folgenden Kontext. Steht die Antwort nicht darin, sage das offen. Antworte auf Deutsch.
-Zitiere im Text mit [1], aber füge keine eigene Quellenliste an, da die Anwendung sie anhängt.
+Füge keine eigene Quellenliste an, da die Anwendung sie anhängt.
 
 Kontext [1]:
 ${knowledge}`;
@@ -88,7 +88,8 @@ ${knowledge}`;
       // weil du selbst der Nutzer bist. In einer Mehrbenutzer-Anwendung würdest du sie verwerfen;
       // Zugriffsschutz darf nie vom Prompt abhängen.
       const { systemPrompts, conversation } = splitSystemPrompts(chatRequest.messages);
-      const plainMessages = toPlainMessages(conversation);
+      // Open WebUI schickt frühere Antworten samt Quellenliste zurück; ohne `withoutSourceLists` könnte das Modell die alte Liste kopieren.
+      const plainMessages = withoutSourceLists(toPlainMessages(conversation));
       const question = plainMessages.findLast(({ role }) => role === 'user')?.content ?? '';
       const task = isOpenWebUITask(question);
       const messages = [

@@ -35,6 +35,7 @@ import { toPlainMessages, type PlainMessage } from '../shared/messages.ts';
 import { log, logHttpRequests, logInvocation } from '../shared/logging.ts';
 import { listenWithLogging, logHttpErrors, prepareFacade } from '../shared/server.ts';
 import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
+import { stripThinking } from '../shared/text.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-02-part-3';
@@ -106,7 +107,8 @@ async function main() {
       // gültige und ungültige Aufrufe gemischt sind: Dann läuft in dieser Runde gar kein Werkzeug, und das
       // Modell versucht es in der nächsten Runde noch einmal.
       if (invalidToolCalls.length) {
-        messages.push({ role: 'assistant', content: reply.text || '(ungültiger Tool-Aufruf)' });
+        // Denkschritte (`<think>…</think>`) gehören nicht in den Verlauf, den das Modell in der nächsten Runde liest.
+        messages.push({ role: 'assistant', content: stripThinking(reply.text) || '(ungültiger Tool-Aufruf)' });
         messages.push({
           role: 'user',
           content: invalidToolCalls.map((call) =>

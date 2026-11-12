@@ -35,7 +35,7 @@ import { isOpenWebUITask, splitSystemPrompts, toPlainMessages, withLastUserConte
 import { log, logHttpRequests, logInvocation } from '../shared/logging.ts';
 import { listenWithLogging, logHttpErrors, prepareFacade } from '../shared/server.ts';
 import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
-import { formatSourceList } from '../shared/text.ts';
+import { formatSourceList, withoutSourceLists } from '../shared/text.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-02-part-2';
@@ -166,7 +166,8 @@ ${knowledge}
     // Sie bekommen einen reduzierten System-Prompt (`taskSystemPrompt`): Die Regel "nur mit dem Kontext" würde das JSON für Titel und Tags brechen.
     // Die Leitplanke gegen Anweisungen im Material und die Sprachregel bleiben, wer "### Task:" tippt, umgeht also nichts Wichtiges.
     const { systemPrompts, conversation } = splitSystemPrompts(chatRequest.messages);
-    const messages = toPlainMessages(conversation);
+    // Open WebUI schickt frühere Antworten samt Quellenliste zurück; ohne `withoutSourceLists` könnte das Modell die alte Liste kopieren.
+    const messages = withoutSourceLists(toPlainMessages(conversation));
     const question = messages.findLast(({ role }) => role === 'user')?.content ?? '';
     const task = isOpenWebUITask(question);
     const knowledge = task ? '' : await logInvocation('Hacker News', {}, getHackerNewsTitles);
