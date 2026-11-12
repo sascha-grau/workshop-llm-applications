@@ -1,4 +1,4 @@
-// Indexdateien unter `indexes/` lesen und schreiben, Ranking. Lektion 04 schreibt die Indizes, die Lektionen 05 bis 07 lesen sie (Lektion 06 lädt sie in Qdrant).
+// Indexdateien unter `indexes/` lesen und schreiben, Ranking. Lektion 04 schreibt die Indizes, die Lektionen 05 bis 08 lesen sie (Lektion 06 lädt sie in Qdrant).
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
@@ -8,7 +8,7 @@ import { indexesDirectory } from './paths.ts';
 
 // Format der Indexdateien; erhöhe die Zahl, wenn sich ihre Form ändert (alte Dateien werden dann abgelehnt).
 export const INDEX_FORMAT_VERSION = 2;
-// Wie viele Treffer die Suche in Lektion 04 standardmäßig behält (die Lektionen 05 bis 07 setzen eigene Werte je Datei).
+// Wie viele Treffer die Suche in Lektion 04 standardmäßig behält (die Lektionen 05 bis 08 setzen eigene Werte je Datei).
 export const DEFAULT_TOP_K = 3;
 // Die vier Schneide-Strategien von Lektion 04; je Strategie gibt es eine Indexdatei.
 export type Strategy = 'prepared' | 'headings' | 'semantic' | 'questions';
@@ -29,7 +29,7 @@ export type IndexEntry<TMetadata = ChunkMetadata> =
   Omit<z.infer<typeof indexEntrySchema>, 'metadata'> & { metadata: TMetadata };
 
 // Der gemeinsame Embedding-Client (Fabrik aus shared/embeddings.ts: Fließkommazahlen, Zeilenumbrüche
-// bleiben erhalten, keine Wiederholungen), für alle Teile von Lektion 04 bis 07.
+// bleiben erhalten, keine Wiederholungen), für alle Teile von Lektion 04 bis 08.
 export const embeddings = createEmbeddings();
 
 /**
@@ -42,7 +42,7 @@ export function indexFileFor(strategy: Strategy): string {
 }
 
 // Die Dokumente tragen selbst keine Zugriffsinformation. Der Anhang steht stellvertretend für ein
-// Dokument, das nicht jeder lesen darf (die Lektionen 05 und 07 filtern ihn aus der Suche; Lektion 06 sucht bewusst ungefiltert).
+// Dokument, das nicht jeder lesen darf (die Lektionen 05 und 07 und Lektion 08, Teil 2, 3 und 5 filtern ihn aus der Suche; Lektion 06 sucht bewusst ungefiltert).
 export const INTERNAL_DOCUMENTS = ['11-appendix-llm-application-architecture-and-threat-modeling.md'];
 
 /**
@@ -51,7 +51,7 @@ export const INTERNAL_DOCUMENTS = ['11-appendix-llm-application-architecture-and
  */
 export type ChunkMetadata = z.infer<typeof indexEntrySchema>['metadata'];
 
-// Der Zugriffsfilter von Lektion 05 und 07: Ein Chunk gilt nur dann als öffentlich, wenn seine
+// Der Zugriffsfilter von Lektion 05, 07 und 08 (Teil 2, 3 und 5): Ein Chunk gilt nur dann als öffentlich, wenn seine
 // Metadaten "public" sagen UND sein Dokument nicht als intern geführt ist. Die zweite Prüfung
 // fängt einen falsch beschrifteten oder von Hand bearbeiteten Index ab: im Zweifel draußen.
 export const isPublicChunk = ({ accessGroup, source }: Pick<ChunkMetadata, 'accessGroup' | 'source'>) =>
@@ -95,7 +95,7 @@ export function readIndex(strategy: Strategy): z.infer<typeof indexEntrySchema>[
   }
 }
 
-// Die Fehlermeldung, wenn eine der Lektionen 05 bis 07 einen Index nicht laden kann: Sie nennt die Datei und
+// Die Fehlermeldung, wenn eine der Lektionen 05 bis 08 einen Index nicht laden kann: Sie nennt die Datei und
 // die npm-Skripte, die sie erzeugen. `cause` ist der ursprüngliche Fehler.
 export function indexLoadError(strategy: Strategy, cause: unknown): Error {
   return new Error(

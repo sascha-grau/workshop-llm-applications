@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-**Learning goal:** You understand what an embedding is, compare texts with cosine similarity, and see what the prefixes `query: ` and `passage: ` are for. This is the foundation of the search in Lessons 04 to 07.
+**Learning goal:** You understand what an embedding is, compare texts with cosine similarity, and see what the prefixes `query: ` and `passage: ` are for. This is the foundation of the search in Lessons 04 to 08.
 
 | Part | File | npm script | Learning goal | Requires |
 | --- | --- | --- | --- | --- |

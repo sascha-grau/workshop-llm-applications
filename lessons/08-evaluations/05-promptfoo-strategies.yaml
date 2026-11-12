@@ -1,0 +1,145 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+#
+# Lektion 08 – Evaluierung, Teil 5: Chunking-Strategien mit promptfoo vergleichen
+#
+# Lernziel: Du misst mit einem Testwerkzeug, welche Chunking-Strategie aus Lektion 04 die besten
+# Antworten liefert, und siehst Trefferquote, MRR, Quellentreue und Korrektheit aus Teil 1 bis 3
+# in einer Tabelle, je Strategie eine Spalte.
+#
+# Teil 1 bis 4 messen mit eigenem Code. promptfoo (https://www.promptfoo.dev/) ist ein Werkzeug,
+# das dasselbe für viele Fragen und mehrere Varianten auf einmal macht: Es schickt jede Frage an
+# jeden Provider, prüft jede Antwort mit Regeln (`assert`) und zeigt alles nebeneinander. Schritte:
+#   1. Provider: je Strategie einer, alle mit demselben Assistenten (`promptfoo-assistant.ts`, die
+#      Pipeline aus Lektion 07). Nur der Index wechselt (`config.strategy`).
+#   2. Testfälle: die Fragen aus dem Fragen-Set von Lektion 05 außer F-11 (`promptfoo-testcases.ts`).
+#   3. Prüfungen je Antwort (`defaultTest.assert`): Quellentreffer und MRR ohne Sprachmodell aus den
+#      Metadaten des Providers, Quellentreue und Korrektheit mit einem Judge.
+#
+# KERN: Die Prüfungen messen dasselbe wie Teil 1 bis 3. `source-hit` ist die Trefferquote, `mrr`
+# der MRR (der Mittelwert je Spalte), `faithful` die Quellentreue (wie RAGAS: Antwort in Aussagen
+# zerlegen, jede gegen den Kontext prüfen), `correct` die Korrektheit gegen die Kernaussage.
+#
+# Merke: Der Fragen-Index (Lektion 04, Teil 4) enthält standardmäßig nur `01-llm01-prompt-injection.md`
+# (`FULL_CORPUS = false`). Er bekommt deshalb nur Fragen zu dieser Datei (`tests.config.subset`);
+# alle anderen Fragen gehen nur an die Provider mit dem Label `corpus:…`. Setzt du dort
+# `FULL_CORPUS = true` und erzeugst den Index neu, lösche `subset` und benenne den Provider um.
+# Judge ist das lokale Chat-Modell aus `.env`; ein kleines Modell urteilt unzuverlässig. Kosten: je
+# Frage und Strategie ein Embedding und ein Chat-Aufruf für die Antwort, dazu mehrere Judge-Aufrufe.
+#
+# Voraussetzungen: LM Studio läuft mit E5- und Chat-Modell; die Chunks aus Lektion 04, Teil 0 und
+# die Indizes aus Teil 1 bis 4 existieren (`npm run l04:0`, dann `l04:1` bis `l04:4`). Fehlt ein
+# Index, zeigt promptfoo bei diesem Provider die Fehlermeldung mit dem passenden npm-Skript. Open
+# WebUI und Qdrant braucht dieser Teil nicht. Burp ist optional.
+# Start: npm run l08:5   (lädt `.env` und `promptfoo.env`, fragt ohne Cache, schreibt den Bericht
+#        results/lesson-08-promptfoo/05-promptfoo-strategies.html, den du direkt im Browser öffnest)
+#        npm run l08:5 -- --filter-first-n 3   (nur die ersten drei Fragen: schneller Probelauf)
+#        oder Datei öffnen, unter "Ausführen und Debuggen" die Konfiguration "promptfoo: current config"
+#        wählen und F5 drücken ("Run current file" ist nur für .ts-Dateien; der Bericht heißt gleich)
+#        npx promptfoo view   (Ergebnisse als Web-App mit Mittelwert je Spalte, für die Aufgaben; lauscht
+#        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
+# Dauer: gemessen rund 15 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
+# (gut 35 Zellen) dauert also etwa 10 Minuten, auf langsamer Hardware länger. Strg+C hält an;
+# `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed … shutting down" nach
+# Strg+C heißen nur: Diese Urteile wurden abgebrochen.
+#
+# Aufgabe:
+#   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).
+#      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
+#      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
+#      fehlt sie, siehe `promptfoo-testcases.ts`.)
+#   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
+#      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
+#   3. Ändere `topK` bei einem Provider auf 3 (unter `config`) und starte erneut. Wie ändern sich
+#      Trefferquote und Quellentreue?
+
+description: 'Lektion 08, Teil 5: Chunking-Strategien aus Lektion 04 mit promptfoo vergleichen'
+
+# Die Frage geht unverändert an den Provider; System-Prompt und Kontext baut der Assistent selbst.
+prompts:
+  - '{{query}}'
+
+# Je Strategie ein Provider: derselbe Assistent, nur ein anderer Index (Lektion 04, Teil 1 bis 4).
+providers:
+  - id: file://promptfoo-assistant.ts
+    label: corpus:prepared
+    config: { strategy: prepared }
+  - id: file://promptfoo-assistant.ts
+    label: corpus:headings
+    config: { strategy: headings }
+  - id: file://promptfoo-assistant.ts
+    label: corpus:semantic
+    config: { strategy: semantic }
+  - id: file://promptfoo-assistant.ts
+    label: subset:questions
+    config: { strategy: questions }
+
+# Die Fragen aus dem Fragen-Set von Lektion 05 außer F-11. Der Fragen-Index bekommt nur die Fragen zu `subset`.
+tests:
+  path: file://promptfoo-testcases.ts
+  config:
+    subset: [01-llm01-prompt-injection.md]
+    providersOutsideSubset: ['corpus:*']
+
+defaultTest:
+  options:
+    # Der Judge: das Chat-Modell aus `.env` über die OpenAI-kompatible API von LM Studio. Ohne diese
+    # Angabe würde promptfoo OpenAI in der Cloud fragen. Ein stärkeres Modell? Nur die Werte ändern.
+    # Derselbe Block steht in Teil 6; halte beide gleich.
+    provider:
+      id: 'openai:chat:{{ env.REMOTE_MODEL_NAME }}'
+      config:
+        # Fällt auf LM Studio zurück, nie auf OpenAI in der Cloud, falls die Variable fehlt oder leer ist
+        # (`true`: auch ein leerer Wert gilt als fehlend).
+        apiBaseUrl: '{{ env.REMOTE_MODEL_BASE_URL | default("http://localhost:1234/v1", true) }}'
+        # Nur der NAME der Variable, nicht ihr Wert: promptfoo speichert die Konfiguration jedes Laufs
+        # in seiner Datenbank; ein hier eingesetzter Schlüssel stünde dort im Klartext.
+        apiKeyEnvar: REMOTE_MODEL_API_KEY
+        # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
+        apiKeyRequired: false
+        temperature: 0
+        # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte: Mit ihnen schrieb qwen3.5-4b vor
+        # jedem Urteil rund 2500 Tokens, stieß an die Grenze und lieferte gar keine Antwort (promptfoo
+        # meldet dann "context-faithfulness produced malformed response").
+        max_tokens: 2048
+        # Schaltet die Denkschritte ab; `passthrough` geht unverändert an LM Studio. qwen3.5 in LM Studio
+        # hält sich daran (gemessen: 57 statt rund 2500 Tokens). Ein Modell, das den Wert nicht kennt,
+        # ignoriert ihn; dann reicht `max_tokens` vielleicht nicht, siehe README.
+        passthrough:
+          reasoning_effort: none
+  assert:
+    # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die
+    # Trefferquote (Teil 1). Die Treffer stehen in den Metadaten des Providers, nicht in der Antwort.
+    - type: javascript
+      metric: source-hit
+      value: "context.vars.expectedSources.split(', ').some((source) => context.providerResponse?.metadata?.sources?.includes(source))"
+    # 1 / Rang der ersten erwarteten Datei, 0 außerhalb der Treffer. Der Mittelwert ist der MRR (Teil 1).
+    # Ein Wert 0 zählt bei promptfoo als "nicht bestanden"; maßgeblich ist der Mittelwert der Metrik.
+    - type: javascript
+      metric: mrr
+      value: |
+        const expected = context.vars.expectedSources.split(', ');
+        const sources = context.providerResponse?.metadata?.sources ?? [];
+        const rank = sources.findIndex((source) => expected.includes(source)) + 1;
+        return rank > 0 ? 1 / rank : 0;
+    # Quellentreue (Teil 2), wie RAGAS (ein verbreitetes Evaluierungs-Framework für RAG): Antwort in
+    # Aussagen zerlegen, jede gegen den Kontext prüfen. Schwelle 1 heißt: jede Aussage gedeckt. Das ist
+    # bewusst streng; mit einem kleinen Judge scheitern daran viele Zeilen. Lies deshalb den Mittelwert
+    # der Metrik `faithful`, nicht nur bestanden/nicht bestanden. "Could not parse context-faithfulness
+    # verdicts" heißt: Der Judge hat das Antwortformat nicht eingehalten (zählt als 0); das passiert
+    # mit kleinen Modellen. Der Kontext kommt aus den Metadaten des Providers.
+    - type: context-faithfulness
+      metric: faithful
+      contextTransform: context.metadata.context
+      threshold: 1
+    # Korrektheit (Teil 3): Die Rubrik ist der Prompt des Judge. Dieselbe Rubrik steht in Teil 6;
+    # änderst du sie, ändere beide, sonst sind die Spalten nicht vergleichbar. Der zweite Satz ist Absicht: Ohne ihn
+    # wertet ein Judge "der Kontext enthält dazu nichts" oft als korrekt (siehe `HONEST_NO` in Teil 3).
+    - type: llm-rubric
+      metric: correct
+      value: >-
+        Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
+        Sagt die Antwort, der Kontext enthalte dazu keine oder keine klare Antwort, ist sie nicht korrekt.
+
+# Ein Testfall nach dem anderen: Ein lokales Modell antwortet nacheinander schneller als parallel.
+evaluateOptions:
+  maxConcurrency: 1

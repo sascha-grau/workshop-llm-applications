@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-**Lernziel:** Du verstehst, was ein Embedding ist, vergleichst Texte mit der Kosinus-Ähnlichkeit und siehst, wozu die Präfixe `query: ` und `passage: ` dienen. Das ist die Grundlage der Suche in Lektion 04 bis 07.
+**Lernziel:** Du verstehst, was ein Embedding ist, vergleichst Texte mit der Kosinus-Ähnlichkeit und siehst, wozu die Präfixe `query: ` und `passage: ` dienen. Das ist die Grundlage der Suche in Lektion 04 bis 08.
 
 | Teil | Datei | npm-Skript | Lernziel | Braucht |
 | --- | --- | --- | --- | --- |

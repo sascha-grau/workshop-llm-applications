@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+#
+# Lektion 08 – Evaluierung, Teil 6: den laufenden Assistenten als Black Box testen
+#
+# Lernziel: Du testest die fertige Anwendung so, wie Open WebUI sie sieht: über ihre API, ohne in
+# den Code zu schauen (Black-Box-Test). Du siehst, was ein solcher Test messen kann und was nicht.
+#
+# Teil 5 ruft die Pipeline direkt auf und bekommt Treffer und Kontext als Metadaten. Hier spricht
+# promptfoo dieselbe Ollama-API wie Open WebUI mit der laufenden Fassade aus Lektion 07; die
+# Anwendung bleibt unverändert. Schritte:
+#   1. Provider: ein Modell der Fassade (`lesson-07-hybrid`, Hybrid-Suche in der Qdrant-Collection
+#      aus Lektion 06, der ganze Korpus). Adresse aus `FACADE_HOST` und `FACADE_PORT` in `.env`.
+#   2. Testfälle: die Fragen aus dem Fragen-Set von Lektion 05 außer F-11 (`promptfoo-testcases.ts`).
+#   3. Prüfungen: Quellentreffer in der Antwort und Korrektheit mit einem Judge.
+#
+# KERN: Ein Black-Box-Test sieht nur die Antwort. Die Fassade hängt die Quellenliste an (Lektion 07),
+# deshalb lässt sich der Quellentreffer im Text prüfen. Den Kontext sieht der Test nicht, also fehlen
+# MRR und Quellentreue; dafür testet er genau das, was Nutzer bekommen, samt Fassade und Prompt.
+#
+# Merke: Der Test braucht die laufende Anwendung, und die Ergebnisse hängen von ihrem Zustand ab
+# (geladene Collection, Modell in LM Studio). Ein anderes Modell der Fassade testen? Nur `id` und
+# `label` ändern, z. B. `ollama:chat:lesson-07-headings`.
+#
+# Voraussetzungen: LM Studio läuft mit E5- und Chat-Modell; Qdrant läuft und die Collection ist
+# geladen (`npm run l06:1`); die Fassade läuft in einem zweiten Terminal (`npm run l07:11` oder
+# `npm run l07:8`). Open WebUI braucht dieser Teil nicht. Burp ist optional.
+# Start: npm run l08:6   (lädt `.env` und `promptfoo.env`, fragt ohne Cache, schreibt den Bericht
+#        results/lesson-08-promptfoo/06-promptfoo-black-box.html, den du direkt im Browser öffnest)
+#        npm run l08:6 -- --filter-first-n 3   (nur die ersten drei Fragen: schneller Probelauf)
+#        oder Datei öffnen, unter "Ausführen und Debuggen" die Konfiguration "promptfoo: current config"
+#        wählen und F5 drücken ("Run current file" ist nur für .ts-Dateien; der Bericht heißt gleich)
+#        npx promptfoo view   (Web-App wie in Teil 5; im geteilten WLAN nach dem Ansehen beenden)
+# Läuft die Fassade nicht, zeigt jede Zeile einen Verbindungsfehler (z. B. "ECONNREFUSED").
+#
+# Aufgabe:
+#   1. Starte die Tests und vergleiche Trefferquote und Korrektheit mit `corpus:headings` aus Teil 5.
+#      Beide nutzen dieselben Chunks (Index aus `l04:2`), nur öffentliche Dokumente und fünf Treffer;
+#      anders ist die Suche (hybrid statt nur Vektoren) und der Weg (über die Fassade). Ist die
+#      Hybrid-Suche besser? (Erwartung: ähnlich oder besser; mit elf Fragen ist der Unterschied klein.)
+#   2. Ändere den Provider auf `ollama:chat:lesson-07-score-threshold` und starte erneut (braucht die
+#      Fassade aus `npm run l07:11`; `l07:8` bietet nur `lesson-07-hybrid`). Bei welchen
+#      Fragen lehnt die Anwendung ab, und wie wirkt sich das auf die Korrektheit aus?
+#   3. Welche Prüfung aus Teil 5 fehlt hier, und warum lässt sie sich über die API nicht rechnen?
+
+description: 'Lektion 08, Teil 6: die laufende Fassade aus Lektion 07 als Black Box testen'
+
+# Die Frage geht unverändert an die Fassade, wie aus dem Chatfenster von Open WebUI.
+prompts:
+  - '{{query}}'
+
+# promptfoo spricht dieselbe Ollama-API wie Open WebUI. Host und Port kommen aus `.env`, dieselben
+# Werte, mit denen die Fassade startet. Steht dort `FACADE_HOST=0.0.0.0` (Open WebUI in Docker),
+# klappt das unter Linux und macOS; unter Windows trage hier `127.0.0.1` ein.
+providers:
+  - id: ollama:chat:lesson-07-hybrid
+    label: lesson-07-hybrid
+    env:
+      OLLAMA_BASE_URL: 'http://{{ env.FACADE_HOST | default("127.0.0.1", true) }}:{{ env.FACADE_PORT | default("11435", true) }}'
+
+# Alle Fragen außer denen zum internen Anhang: Die Collection enthält den ganzen öffentlichen Korpus.
+tests:
+  path: file://promptfoo-testcases.ts
+
+defaultTest:
+  options:
+    # Der Judge, wie in Teil 5 (dort sind die Zeilen erklärt): das Chat-Modell aus `.env`. Halte beide Blöcke gleich.
+    provider:
+      id: 'openai:chat:{{ env.REMOTE_MODEL_NAME }}'
+      config:
+        apiBaseUrl: '{{ env.REMOTE_MODEL_BASE_URL | default("http://localhost:1234/v1", true) }}'
+        apiKeyEnvar: REMOTE_MODEL_API_KEY
+        apiKeyRequired: false
+        temperature: 0
+        max_tokens: 2048
+        passthrough:
+          reasoning_effort: none
+  assert:
+    # Die Fassade hängt die Quellenliste an die Antwort an (Lektion 07); mehr sieht ein Black-Box-Test nicht.
+    - type: javascript
+      metric: source-hit
+      # Gesucht wird nur in der angehängten Liste (nach "**Quellen"), nicht im Antworttext: Nennt das
+      # Modell einen Dateinamen nur im Text (oder wurde es dazu gebracht), zählt das nicht als Treffer.
+      # Der Text "\n---\n**Quellen" ist `SOURCE_LIST_PREFIX` aus shared/text.ts; ändere beide zusammen.
+      value: |
+        const sourceList = output.split('\n---\n**Quellen').at(-1) ?? '';
+        return output.includes('\n---\n**Quellen')
+          && context.vars.expectedSources.split(', ').some((source) => sourceList.includes(source));
+    # Korrektheit wie in Teil 5 (und Teil 3).
+    - type: llm-rubric
+      metric: correct
+      value: >-
+        Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
+        Sagt die Antwort, der Kontext enthalte dazu keine oder keine klare Antwort, ist sie nicht korrekt.
+
+# Ein Testfall nach dem anderen: Fassade und lokales Modell beantworten eine Frage nach der anderen.
+evaluateOptions:
+  maxConcurrency: 1

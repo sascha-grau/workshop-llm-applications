@@ -2,8 +2,9 @@
   "version": "0.2.0",
   "configurations": [
     {
-      // F5 startet die gerade geöffnete Lektions-Datei im Debugger. Node führt TypeScript direkt aus,
-      // es gibt keinen Build-Schritt, Haltepunkte bleiben also in den Originalzeilen.
+      // F5 startet die gerade geöffnete Lektions-Datei (.ts) im Debugger. Node führt TypeScript direkt aus,
+      // es gibt keinen Build-Schritt, Haltepunkte bleiben also in den Originalzeilen. Nur für .ts-Dateien:
+      // Ist z. B. .env oder eine YAML-Datei geöffnet, versucht Node sie als Programm auszuführen.
       "type": "node",
       "request": "launch",
       "name": "Run current file",
@@ -12,6 +13,28 @@
       "runtimeArgs": [
         "--env-file-if-exists=.env"
       ],
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      // Für Lektion 08, Teil 5 und 6: Öffne 05-promptfoo-strategies.yaml oder 06-promptfoo-black-box.yaml,
+      // wähle diese Konfiguration einmal unter "Ausführen und Debuggen" aus und drücke F5. Wie die npm-Skripte
+      // l08:5 und l08:6: promptfoo lädt .env (Judge-Modell, Adresse der Fassade) und promptfoo.env, ohne Cache,
+      // und schreibt den Bericht nach results/lesson-08-promptfoo/.
+      "type": "node",
+      "request": "launch",
+      "name": "promptfoo: current config",
+      "program": "${workspaceFolder}/node_modules/promptfoo/dist/src/entrypoint.js",
+      "args": [
+        "eval", "-c", "${file}",
+        "--env-file", ".env",
+        "--env-file", "lessons/08-evaluations/promptfoo.env",
+        "--no-cache",
+        "-o", "results/lesson-08-promptfoo/${fileBasenameNoExtension}.html"
+      ],
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "skipFiles": [
         "<node_internals>/**"
