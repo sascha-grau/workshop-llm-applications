@@ -12,7 +12,7 @@
 | 4 | `04-hybrid-rrf.ts` | `npm run l06:4` | Hybrid search: combine both lists by rank with RRF | like Part 3 |
 | 5 | `05-reranking.ts` | `npm run l06:5` | Reranking: a language model re-sorts the hits, at a cost per candidate | like Part 3, plus chat model |
 | 6 | `06-multiquery.ts` | `npm run l06:6` | Multi-query: rephrase the question, search with every version, merge with RRF | like Part 5 |
-| 7 | `07-full-demo.ts` | `npm run l06:7` | All methods side by side with their costs | like Part 5 |
+| 7 | `99-full-demo.ts` | `npm run l06:7` | All methods side by side with their costs | like Part 5 |
 
 `hybrid.ts` is the helper module shared by all parts (connection to Qdrant, collection names), not a part of its own. Ranking and index files live in [`shared/index.ts`](../shared/index.ts).
 
@@ -82,7 +82,7 @@ Translated from the `Aufgabe` block at the top of each file; the file headers re
 2. Compare the columns: How many hits in each column come from `02-llm02-offenlegung-sensibler-informationen.md`, and which hits do all lists find?
 3. Set `VARIANT_COUNT` to 1 and then to 5. Are more versions worth it, measured by the time?
 
-### Part 7 – `07-full-demo.ts`
+### Part 7 – `99-full-demo.ts`
 
 1. Compare the three columns in step 1 for both questions: For which question does the hybrid search help compared with the better of the two single searches?
 2. Compare the costs of reranking and multi-query: Which method changes the hits for the colloquial question more, measured by the hits from `02-llm02-offenlegung-sensibler-informationen.md`?

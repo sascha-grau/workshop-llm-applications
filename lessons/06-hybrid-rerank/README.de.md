@@ -12,7 +12,7 @@
 | 4 | `04-hybrid-rrf.ts` | `npm run l06:4` | Hybrid-Suche: beide Listen über die Ränge mit RRF verbinden | wie Teil 3 |
 | 5 | `05-reranking.ts` | `npm run l06:5` | Reranking: ein Sprachmodell sortiert die Treffer neu, mit Kosten je Kandidat | wie Teil 3, dazu Chat-Modell |
 | 6 | `06-multiquery.ts` | `npm run l06:6` | Multi-Query: Frage umformulieren, mit jeder Fassung suchen, mit RRF vereinen | wie Teil 5 |
-| 7 | `07-full-demo.ts` | `npm run l06:7` | Alle Verfahren nebeneinander, samt Kosten | wie Teil 5 |
+| 7 | `99-full-demo.ts` | `npm run l06:7` | Alle Verfahren nebeneinander, samt Kosten | wie Teil 5 |
 
 `hybrid.ts` ist das gemeinsame Hilfsmodul aller Teile (Verbindung zu Qdrant, Collection-Namen), kein eigener Teil. Ranking und Indexdateien liegen in [`shared/index.ts`](../shared/index.ts).
 
@@ -82,7 +82,7 @@ Die Aufgaben stehen auch am Anfang jeder Datei; maßgeblich sind die Dateiköpfe
 2. Vergleiche die Spalten: Wie viele Treffer stammen in jeder Spalte aus `02-llm02-offenlegung-sensibler-informationen.md`, und welche Treffer finden alle Listen?
 3. Setze `VARIANT_COUNT` auf 1 und danach auf 5. Lohnen sich mehr Fassungen, gemessen an der Zeit?
 
-### Teil 7 – `07-full-demo.ts`
+### Teil 7 – `99-full-demo.ts`
 
 1. Vergleiche die drei Spalten in Schritt 1 für beide Fragen: Bei welcher Frage hilft die Hybrid-Suche gegenüber der besseren der beiden Einzelsuchen?
 2. Vergleiche die Kosten von Reranking und Multi-Query: Welches Verfahren verändert die Treffer zur umgangssprachlichen Frage stärker, gemessen an den Treffern aus `02-llm02-offenlegung-sensibler-informationen.md`?
