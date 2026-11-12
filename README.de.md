@@ -140,6 +140,7 @@ Die Einstellungen im Überblick:
 | `REMOTE_MODEL_BASE_URL` | Adresse des Servers mit `/v1`, für Chat und Embeddings (LM Studio: `http://localhost:1234/v1`). |
 | `REMOTE_MODEL_API_KEY` | Nur nötig, wenn der Server einen Schlüssel verlangt. LM Studio braucht keinen. |
 | `REMOTE_MODEL_NAME` | Identifier des Chat-Modells aus LM Studio. |
+| `ALL_DOCUMENTS` | Optional: `true` zeigt die Detailausgabe von Lektion 04, Teil 1 bis 3 für alle Dokumente (nur die Ausgabe, nie der Index). Überschreibt die Konstante in `chunking.ts`; leer gilt die Konstante. |
 | `REMOTE_EMBEDDING_MODEL_NAME` | Identifier des E5-Modells. |
 | `REMOTE_EMBEDDING_GEMMA_MODEL_NAME` | Identifier von EmbeddingGemma, nur für Lektion 03, Teil 2 und 3. |
 | `BURP_PROXY_URL`, `BURP_CA_CERT` | Burp-Proxy und dessen Zertifikat. Optional: `BURP_PROXY_URL` ist standardmäßig leer (kein Proxy), setze sie für Lektion 01, Teil 3 auf `http://localhost:8080`. |

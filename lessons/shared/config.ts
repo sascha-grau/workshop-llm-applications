@@ -60,6 +60,15 @@ function requireEnv(name: string): string {
   return value;
 }
 
+export function optionalBooleanEnv(name: string): boolean | undefined {
+  const value = process.env[name]?.trim();
+  if (!value) return undefined;
+  const normalized = value.toLowerCase();
+  if (['true', '1', 'yes'].includes(normalized)) return true;
+  if (['false', '0', 'no'].includes(normalized)) return false;
+  throw new Error(`${name} must be true or false, got "${value}".`);
+}
+
 function validatedURL(name: string, required = true): string | undefined {
   const value = required ? requireEnv(name) : process.env[name]?.trim();
   if (!value) return undefined;

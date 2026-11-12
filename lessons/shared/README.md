@@ -4,7 +4,7 @@
 
 Several lessons share these files. You do not need to read them to understand the lessons; the lessons explain everything important themselves. This page says what each file is for, in case you want to look something up.
 
-**`config.ts`** reads the settings from `.env` (LM Studio server, model names, Burp, Qdrant address, facade port; older keys report themselves with a hint at the new name) and validates them. Every lesson uses it. A setting is only validated when a program needs it; if it is missing, the program prints a message and exits. Not needed to understand the lessons, unless you wonder where `remoteModel.name` or `baseURL` come from.
+**`config.ts`** reads the settings from `.env` (LM Studio server, model names, Burp, Qdrant address, facade port, the optional switch `ALL_DOCUMENTS`, read via `optionalBooleanEnv`; older keys report themselves with a hint at the new name) and validates them. Every lesson uses it. A setting is only validated when a program needs it; if it is missing, the program prints a message and exits. Not needed to understand the lessons, unless you wonder where `remoteModel.name` or `baseURL` come from.
 
 **`paths.ts`** defines where the repo root and the `content/` and `indexes/` folders are. File paths in the code (certificate, chunks, indexes) are resolved from there, so the programs work from any working directory. Only `.env` is loaded by Node relative to the working directory. `proxy.ts` uses it from Lesson 01, Part 3; from Lesson 04, `content/` and `indexes/` join in. Not needed to understand the lessons.
 

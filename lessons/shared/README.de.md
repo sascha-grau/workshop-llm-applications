@@ -4,7 +4,7 @@
 
 Diese Dateien nutzen mehrere Lektionen gemeinsam. Du musst sie zum Verstehen der Lektionen nicht lesen, die Lektionen erklären alles Wichtige selbst. Hier steht, wozu jede Datei da ist, falls du nachschauen willst.
 
-**`config.ts`** liest die Einstellungen aus `.env` (LM-Studio-Server, Modellnamen, Burp, Qdrant-Adresse, Fassaden-Port; ältere Schlüssel melden sich mit einem Hinweis auf den neuen Namen) und prüft sie. Jede Lektion nutzt sie. Eine Einstellung wird erst geprüft, wenn ein Programm sie braucht; fehlt sie, gibt das Programm eine Meldung aus und beendet sich. Zum Verstehen der Lektionen nicht nötig, außer du fragst dich, woher `remoteModel.name` oder `baseURL` kommen.
+**`config.ts`** liest die Einstellungen aus `.env` (LM-Studio-Server, Modellnamen, Burp, Qdrant-Adresse, Fassaden-Port, der optionale Schalter `ALL_DOCUMENTS`, gelesen über `optionalBooleanEnv`; ältere Schlüssel melden sich mit einem Hinweis auf den neuen Namen) und prüft sie. Jede Lektion nutzt sie. Eine Einstellung wird erst geprüft, wenn ein Programm sie braucht; fehlt sie, gibt das Programm eine Meldung aus und beendet sich. Zum Verstehen der Lektionen nicht nötig, außer du fragst dich, woher `remoteModel.name` oder `baseURL` kommen.
 
 **`paths.ts`** legt fest, wo das Repo-Root und die Ordner `content/` und `indexes/` liegen. Dateipfade im Code (Zertifikat, Chunks, Indizes) werden von dort aus aufgelöst, deshalb funktionieren die Programme aus jedem Arbeitsverzeichnis. Nur `.env` lädt Node relativ zum Arbeitsverzeichnis. `proxy.ts` nutzt es ab Lektion 01, Teil 3, ab Lektion 04 kommen `content/` und `indexes/` dazu. Zum Verstehen der Lektionen nicht nötig.
 

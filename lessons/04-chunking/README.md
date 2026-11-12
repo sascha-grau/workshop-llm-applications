@@ -52,7 +52,7 @@ Translated from the `Aufgabe` block at the top of each file; the file headers re
 ### Part 1 – `01-prepared-chunks.ts`
 
 1. Change `DEMO_QUESTION` in `chunking.ts` (e.g. `Was ist ein Jailbreak?` (What is a jailbreak?)). Are the hits still in the right document?
-2. Change `EXAMPLE_DOCUMENT` in `chunking.ts` to another document from the manifest. How many chunks does it have, and how many characters per token? With `ALL_DOCUMENTS = true`, Parts 1 to 3 show the chunk tables of all documents (output only, the index stays the same). Reset both values afterwards (`'01-llm01-prompt-injection.md'` and `false`): Parts 2 and 3 show their example output with them, and Part 4 uses `EXAMPLE_DOCUMENT` when `FULL_CORPUS = false`.
+2. Change `EXAMPLE_DOCUMENT` in `chunking.ts` to another document from the manifest. How many chunks does it have, and how many characters per token? With `ALL_DOCUMENTS = true` (or `ALL_DOCUMENTS=true` in `.env`), Parts 1 to 3 show the chunk tables of all documents (output only, the index stays the same). Reset both values afterwards (`'01-llm01-prompt-injection.md'` and `false`; empty or remove the entry in `.env`): Parts 2 and 3 show their example output with them, and Part 4 uses `EXAMPLE_DOCUMENT` when `FULL_CORPUS = false`.
 3. Look at the "characters per token" column: which chunks are clearly below 4? What is in them (hint: link lists)? (Only meaningful if `counting_method` in the manifest is not `character-estimate`; with `character-estimate` every value is about 1.)
 
 ### Part 2 – `02-heading-chunking.ts`

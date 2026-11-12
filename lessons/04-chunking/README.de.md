@@ -48,7 +48,7 @@ Die Aufgaben stehen auch am Anfang jeder Datei; maßgeblich sind die Dateiköpfe
 ### Teil 1 – `01-prepared-chunks.ts`
 
 1. Ändere `DEMO_QUESTION` in chunking.ts (z. B. "Was ist ein Jailbreak?"). Stehen die Treffer noch im richtigen Dokument?
-2. Ändere `EXAMPLE_DOCUMENT` in chunking.ts auf ein anderes Dokument aus dem Manifest. Wie viele Chunks hat es, und wie viele Zeichen je Token? Mit `ALL_DOCUMENTS = true` zeigen Teil 1 bis 3 die Chunk-Tabellen aller Dokumente (nur die Ausgabe, der Index bleibt gleich). Setze beide Werte danach zurück (`'01-llm01-prompt-injection.md'` und `false`): Teil 2 und 3 zeigen ihre Beispielausgabe mit ihnen, und Teil 4 nutzt `EXAMPLE_DOCUMENT` bei `FULL_CORPUS = false`.
+2. Ändere `EXAMPLE_DOCUMENT` in chunking.ts auf ein anderes Dokument aus dem Manifest. Wie viele Chunks hat es, und wie viele Zeichen je Token? Mit `ALL_DOCUMENTS = true` (oder `ALL_DOCUMENTS=true` in `.env`) zeigen Teil 1 bis 3 die Chunk-Tabellen aller Dokumente (nur die Ausgabe, der Index bleibt gleich). Setze beide Werte danach zurück (`'01-llm01-prompt-injection.md'` und `false`, den Eintrag in `.env` leere oder entferne): Teil 2 und 3 zeigen ihre Beispielausgabe mit ihnen, und Teil 4 nutzt `EXAMPLE_DOCUMENT` bei `FULL_CORPUS = false`.
 3. Schau dir die Spalte "characters per token" an: Welche Chunks liegen deutlich unter 4? Was steht in ihnen (Tipp: Linklisten)? (Nur aussagekräftig, wenn `counting_method` im Manifest nicht `character-estimate` ist – dann liegt jeder Wert bei etwa 1.)
 
 ### Teil 2 – `02-heading-chunking.ts`

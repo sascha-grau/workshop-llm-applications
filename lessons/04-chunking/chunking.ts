@@ -15,6 +15,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { optionalBooleanEnv } from '../shared/config.ts';
 import { assertVectorCount, e5Model } from '../shared/embeddings.ts';
 import { contentDirectory } from '../shared/paths.ts';
 import { MANIFEST_FILE, manifestSchema, type Manifest } from './formats.ts';
@@ -35,7 +36,7 @@ export const CHUNK_DIRECTORY = join(contentDirectory, 'owasp-genai-top-10', 'chu
 // Für welche Dokumente Teil 1 bis 3 die Detailausgabe zeigen (Chunk-Tabellen, in Teil 3 auch Abstände
 // und Schnitte): `ALL_DOCUMENTS = false` = nur EXAMPLE_DOCUMENT, true = alle (längere Ausgabe).
 // ALL_DOCUMENTS ändert nur die Ausgabe, nie den Index; EXAMPLE_DOCUMENT wählt zusätzlich das Dokument
-// für Teil 4 bei FULL_CORPUS = false.
+// für Teil 4 bei FULL_CORPUS = false. `ALL_DOCUMENTS=true` in `.env` überschreibt die Konstante, ohne Code zu ändern.
 export const EXAMPLE_DOCUMENT = '01-llm01-prompt-injection.md';
 export const ALL_DOCUMENTS = false;
 // Die Ausgabe der OWASP-Liste. Sie gehört zum Korpus, deshalb bekommt jeder Chunk denselben Wert.
@@ -81,7 +82,7 @@ export function sourcesFor(subset: string[] = [], manifest = readManifest()): st
 // `scope` (Teil 2: die indizierten Dokumente) grenzt das "alle" ein.
 export function exampleDocuments(manifest = readManifest(), scope?: string[]): string[] {
   const sources = manifest.sources.map(({ file }) => file);
-  if (ALL_DOCUMENTS) return scope ?? sources;
+  if (optionalBooleanEnv('ALL_DOCUMENTS') ?? ALL_DOCUMENTS) return scope ?? sources;
   if (!sources.includes(EXAMPLE_DOCUMENT)) throw new Error(`Unknown EXAMPLE_DOCUMENT: ${EXAMPLE_DOCUMENT}. Check manifest.json.`);
   return [EXAMPLE_DOCUMENT];
 }
