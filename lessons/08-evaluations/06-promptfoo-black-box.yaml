@@ -73,7 +73,8 @@ defaultTest:
         apiKeyEnvar: REMOTE_MODEL_API_KEY
         apiKeyRequired: false
         temperature: 0
-        max_tokens: 2048
+        # Obergrenze je Urteil; sie muss Denken und JSON abdecken (Begründung in Teil 5).
+        max_tokens: 8192
   assert:
     # Die Fassade hängt die Quellenliste an die Antwort an (Lektion 07); mehr sieht ein Black-Box-Test nicht.
     - type: javascript

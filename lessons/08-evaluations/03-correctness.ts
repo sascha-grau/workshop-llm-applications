@@ -10,9 +10,11 @@
 // Der Judge sieht hier keinen Kontext, nur Frage, Kernaussage und Antwort. Schritte:
 //   1. Index und Frage laden: der Überschriften-Index aus Lektion 04, Teil 2, nur öffentliche
 //      Chunks (`loadPublicIndex`), und die Frage `QUESTION_ID` aus dem Fragen-Set von Lektion 05.
-//   2. Suchen: wie in Teil 2, aber jeder gefundene Abschnitt wird um seine Unterabschnitte aus demselben
-//      Dokument erweitert (`expandSections`): Die Aufzählungen stehen oft dort, nicht im Treffer selbst
-//      (Idee des Parent-Document-Retrievers, Lektion 04, Teil 5). Die besten `TOP_K` Chunks plus ihre
+//   2. Suchen: wie in Teil 2, aber zu den Treffern kommen ihre Unterabschnitte aus demselben Dokument
+//      (`EXPAND_SECTIONS`, begrenzt): Die Aufzählungen stehen oft dort, nicht im Treffer selbst. Das ist
+//      mit dem Parent-Document-Retriever (Lektion 04, Teil 5) verwandt, aber in die andere Richtung:
+//      Gefunden wird ein Abschnitt, mitgeliefert werden seine Unterabschnitte. Die Tabelle zeigt in der
+//      Spalte `via`, was Treffer und was Unterabschnitt ist. Die besten `TOP_K` Chunks plus diese
 //      Unterabschnitte bilden den Kontext.
 //   3. Antworten: Das Chat-Modell beantwortet die Frage nur aus dem Kontext, wie in Teil 2.
 //   4. Urteilen: Der Judge vergleicht die Antwort mit der Kernaussage und antwortet mit JSON, erst
@@ -56,6 +58,8 @@
 //   3. Setze in Teil 2 `INVENTED_ANSWER` probeweise auf den Text von `HONEST_NO` und starte
 //      `npm run l08:2`. Was urteilt der Quellentreue-Judge? Warum braucht eine Evaluierung beide
 //      Messungen? (Erwartung: Teil 2 wertet sie als quellentreu ("yes"), Teil 3 als nicht korrekt.)
+//   4. Setze `EXPAND_SECTIONS = false`: Wie viele Maßnahmen nennt die Antwort jetzt, was urteilt der
+//      Judge, und liegt es an der Suche oder am Judge? Vergleiche mit F-01 in Teil 5.
 import type { ChatOpenAI } from '@langchain/openai';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
@@ -65,11 +69,13 @@ import { answerFromContext, askJudge, createChatModel, judgeAndPrint, reportJudg
 import { runMain } from '../shared/startup.ts';
 
 // Die Frage aus `question-set.json` (Lektion 05), deren Antwort geprüft wird. F-01 ist dieselbe
-// Frage wie in Teil 2, so lassen sich beide Urteile vergleichen.
+// Frage wie in Teil 2; der Kontext ist hier größer (Unterabschnitte).
 const QUESTION_ID = 'F-01';
 // Wie viele Treffer die Suche liefert, wie in Teil 2. Dazu kommen ihre Unterabschnitte
 // (siehe `expandSections`).
 const TOP_K = 5;
+// Ob zu den Treffern ihre Unterabschnitte kommen (siehe Schritt 2); `false` zeigt, was dann fehlt.
+const EXPAND_SECTIONS = true;
 // Gegenprobe: ehrlich, aber nutzlos. Diese Antwort behauptet nichts und ist damit quellentreu (Teil 2
 // würde "yes" sagen), aber sie enthält die Kernaussage nicht. Ein Korrektheits-Judge muss sie ablehnen.
 const HONEST_NO = 'Ich finde dazu nichts im Korpus.';
@@ -110,7 +116,7 @@ async function main() {
   try {
     // Schritt 2 und 3: Suchen (mit den Unterabschnitten der Treffer, sonst fehlen Teile der Aufzählung
     // in F-01) und antworten, wie in Teil 2.
-    const context = await retrieveContext(index, testQuestion.question, TOP_K, { expandSections: true });
+    const context = await retrieveContext(index, testQuestion.question, TOP_K, { expandSections: EXPAND_SECTIONS });
     const answer = await answerFromContext(model, context, testQuestion.question);
 
     // NEU: Schritt 4 und 5: Urteilen, erst die echte Antwort, dann die Gegenprobe. Der Judge bekommt

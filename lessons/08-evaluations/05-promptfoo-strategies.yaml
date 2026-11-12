@@ -19,8 +19,9 @@
 # KERN: Die Prüfungen messen dasselbe wie Teil 1 bis 3. `source-hit` ist die Trefferquote, `mrr`
 # der MRR (der Mittelwert je Spalte), `faithful` die Quellentreue (wie RAGAS: Antwort in Aussagen
 # zerlegen, jede gegen den Kontext prüfen), `correct` die Korrektheit gegen die Kernaussage.
-# Ein ERROR in einer Zelle ("judge format error") heißt: Der Judge hat das JSON-Format nicht eingehalten.
-# Das ist etwas anderes als ein FAIL (die Antwort enthält nicht gedeckte Aussagen).
+# Ein ERROR mit "judge format error" in einer Zelle heißt: Der Judge hat das JSON-Format nicht eingehalten.
+# Das ist etwas anderes als ein FAIL (die Antwort enthält nicht gedeckte Aussagen). Fehlt ein Index, zeigt
+# die Zelle ebenfalls [ERROR] mit "Cannot load index".
 #
 # Merke: Der Fragen-Index (Lektion 04, Teil 4) deckt mit `FULL_CORPUS = true` (Standard) den ganzen
 # Korpus ab; alle Fragen gehen deshalb an alle vier Provider. Hast du dort `FULL_CORPUS = false` gesetzt,
@@ -50,8 +51,9 @@
 #   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).
 #      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
 #      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
-#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in allen Spalten bei etwa 0,9, nur F-05
-#      fehlt; die Unterschiede im MRR sind klein, mit elf Fragen gibt es keinen klaren Sieger.)
+#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in den ersten drei Spalten bei etwa 0,9
+#      (nur F-05 fehlt), `corpus:questions` findet auch F-05; die Unterschiede im MRR sind klein, mit
+#      elf Fragen gibt es keinen klaren Sieger.)
 #   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
 #      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
 #   3. Ändere `topK` bei einem Provider auf 3 (unter `config`) und starte erneut. Wie ändern sich
@@ -88,9 +90,9 @@ defaultTest:
   options:
     # Der Judge: das Chat-Modell aus `.env` über die OpenAI-kompatible API von LM Studio. Ohne diese
     # Angabe würde promptfoo OpenAI in der Cloud fragen. Ein stärkeres Modell? Nur die Werte ändern.
-    # `promptfoo-judge.ts` verpackt `openai:chat:<Modell>`; `showThinking` und `reasoning_effort` setzt es
-    # selbst (siehe `SHOW_THINKING` in `.env.example`), sie stehen deshalb nicht hier.
-    # Derselbe Block steht in Teil 6; halte beide gleich.
+    # Der Block gilt für beide Judge-Prüfungen, `correct` und `faithful`. `promptfoo-judge.ts` verpackt
+    # `openai:chat:<Modell>`; `showThinking` und `reasoning_effort` setzt es selbst (siehe `SHOW_THINKING`
+    # in `.env.example`), sie stehen deshalb nicht hier. Derselbe Block steht in Teil 6; halte beide gleich.
     provider:
       id: file://promptfoo-judge.ts
       config:
@@ -104,11 +106,12 @@ defaultTest:
         # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
         apiKeyRequired: false
         temperature: 0
-        # Obergrenze je Urteil. Ein Judge braucht keine Denkschritte; `promptfoo-judge.ts` bittet per
-        # `reasoning_effort: none` darum und verbirgt sie (ein Server darf die Bitte ignorieren, das Limit muss
-        # sie dann mit abdecken). Mit ihnen schrieb qwen3.5-4b vor jedem Urteil rund 2500 Tokens, stieß an die
-        # Grenze und lieferte gar keine Antwort (das Urteil schlägt dann mit einem Formatfehler fehl).
-        max_tokens: 2048
+        # Obergrenze je Urteil, für beide Judge-Prüfungen. Ein Judge braucht keine Denkschritte;
+        # `promptfoo-judge.ts` bittet per `reasoning_effort: none` darum und verbirgt sie, aber ein Server darf
+        # die Bitte ignorieren. Das Limit muss dann Denken und JSON zusammen abdecken: Gemessen brauchte ein
+        # Urteil bis etwa 2200 Tokens, 8192 lässt Luft. Ein abgeschnittenes Urteil ergibt bei `correct` die
+        # Meldung von promptfoo, bei `faithful` ERROR "judge format error".
+        max_tokens: 8192
   assert:
     # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die
     # Trefferquote (Teil 1). Die Treffer stehen in den Metadaten des Providers, nicht in der Antwort.

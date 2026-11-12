@@ -1,19 +1,22 @@
-// Lektion 08 – Evaluierung: gemeinsame Bausteine für Teil 2 bis 4, kein eigener Teil.
+// Lektion 08 – Evaluierung: gemeinsame Bausteine für Teil 2 bis 5, kein eigener Teil.
 //
 // Teil 2 (Quellentreue) und Teil 3 (Korrektheit) machen dieselben Vorarbeiten: suchen, aus dem
 // Kontext antworten, einen Judge fragen und sein JSON prüfen, zwei Urteile auswerten. Das steht hier,
 // damit jeder Teil nur zeigt, was ihn ausmacht: den Auftrag an den Judge und seine Gegenprobe.
 // Teil 4 (Regression) misst wie Teil 1; die Messung steht hier als `measureRetrieval`, Teil 1 behält
-// seine ausgeschriebene Lehrkopie.
+// seine ausgeschriebene Lehrkopie. Teil 5 (promptfoo) nutzt `createChatModel`, `askJudgeJson` und
+// `wrapUntrusted` für die Prüfung `faithful`.
 // - measureRetrieval: Trefferquote und MRR über das Fragen-Set (wie Teil 1, ohne Tabelle)
 // - createChatModel: Chat-Modell für Antwort und Judge (ohne Streaming, Temperature 0, Timeout)
-// - retrieveContext: Frage einbetten, ranken, Treffer zeigen, Kontext-Text bauen
+// - retrieveContext: Frage einbetten, ranken, Treffer zeigen, Kontext-Text bauen; mit `expandSections`
+//   kommen (begrenzt) die Unterabschnitte der Treffer dazu
 // - answerFromContext: Antwort nur aus dem Kontext, wie in Lektion 07
-// - askJudge: einen Judge fragen und sein Urteil {reasoning, verdict} prüfen
+// - askJudge, askJudgeJson, JudgeFormatError: einen Judge fragen und sein JSON mit einem Schema prüfen
 // - judgeAndPrint, reportJudgeCheck: einen Fall beurteilen und ausgeben, beide Urteile auswerten
-// - wrapUntrusted, preview: fremden Text in Tags verpacken, Text für die Ausgabe kürzen
+// - wrapUntrusted: fremden Text in Tags verpacken
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
+import { stripVTControlCharacters } from 'node:util';
 import { remoteEmbeddingModel, remoteModel, settings } from '../shared/config.ts';
 import { embeddingQuery } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
@@ -23,8 +26,8 @@ import { modelText, stripJsonFence } from '../shared/text.ts';
 // Antwort und Urteil kommen ohne Streaming, also erst am Ende; ein kleines lokales Modell braucht
 // für den Kontext aus mehreren Chunks seine Zeit. Danach lieber abbrechen als endlos warten.
 const MODEL_TIMEOUT_MS = 120_000;
-// So viele Zeichen einer Antwort zeigt die Ausgabe; der Judge prüft immer die ganze Antwort.
-const ANSWER_PREVIEW_LENGTH = 300;
+const MAX_SUBSECTIONS_PER_HIT = 6;
+const MAX_ADDED_SUBSECTIONS = 12;
 
 // Wie in Lektion 07 (rag.ts): nur aus dem Kontext antworten, offen sagen, wenn er nichts hergibt,
 // und den Kontext als nicht vertrauenswürdig behandeln (indirekte Prompt-Injection).
@@ -76,32 +79,41 @@ export async function measureRetrieval(
 }
 
 // Ein Chat-Modell für Antwort und Judge.
-export function createChatModel(): ChatOpenAI {
+export function createChatModel({
+  model = remoteModel.name, apiKey = remoteModel.apiKey, baseURL = remoteModel.baseURL,
+  maxTokens, temperature = 0, modelKwargs = {},
+}: {
+  model?: string; apiKey?: string; baseURL?: string; maxTokens?: number; temperature?: number;
+  modelKwargs?: Record<string, unknown>;
+} = {}): ChatOpenAI {
   return new ChatOpenAI({
     timeout: MODEL_TIMEOUT_MS,
-    model: remoteModel.name,
-    apiKey: remoteModel.apiKey,
+    model,
+    apiKey,
+    maxTokens,
     // Wiederholungen würden in Burp als verwirrende Doppelanfragen auftauchen: lieber sofort scheitern.
     maxRetries: 0,
     disableStreaming: true,
     // 0: dieselbe Eingabe soll möglichst dasselbe Urteil ergeben. Ein Messgerät, das bei jedem Lauf
     // anders anzeigt, misst nichts.
-    temperature: 0,
+    temperature,
     // Ohne Denkschritte bitten wir den Server um keine (`reasoning_effort`); mancher Server ignoriert
     // das, `modelText` lässt sie dann trotzdem weg.
-    modelKwargs: settings.showThinking ? {} : { reasoning_effort: 'none' },
+    modelKwargs: { ...(settings.showThinking ? {} : { reasoning_effort: 'none' }), ...modelKwargs },
     // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
-    configuration: { baseURL: remoteModel.baseURL },
+    configuration: { baseURL },
   });
 }
 
 // Sucht wie in Lektion 05, Teil 1, zeigt die Treffer und liefert den Kontext-Text: je Treffer eine
 // Zeile "[Datei › Abschnitt]", darunter der Chunk-Text. Antwort und Judge bekommen genau diesen Text.
 // In den Log-Details stehen nur Metadaten, nie die Frage.
-// Mit `expandSections` kommen zu den Top-k-Treffern alle Unterabschnitte desselben Dokuments hinzu (gleicher
-// Überschriftenpfad plus weitere Ebenen), z. B. 5 Treffer → 9 Chunks. Teil 3 braucht das: Die Listenpunkte
-// einer Antwort stehen oft in den Unterabschnitten, und sonst wäre die Antwort wirklich unvollständig.
+// Mit `expandSections` kommen zu den Top-k-Treffern Unterabschnitte desselben Dokuments hinzu (gleicher
+// Überschriftenpfad plus weitere Ebenen), z. B. 5 Treffer → 9 Chunks. Die Zahl ist begrenzt (höchstens 6 je
+// Treffer, 12 insgesamt), und ein Treffer an der Dokumentwurzel wird nicht erweitert. Teil 3 braucht das: Die
+// Listenpunkte einer Antwort stehen oft in den Unterabschnitten. Die Tabelle zeigt in der Spalte `via`, ob eine
+// Zeile ein Treffer (mit echtem Rang) oder ein Unterabschnitt von Treffer Nr. n ist.
 export async function retrieveContext(
   index: IndexEntry[], question: string, topK: number, { expandSections = false }: { expandSections?: boolean } = {},
 ): Promise<string> {
@@ -109,17 +121,33 @@ export async function retrieveContext(
     const queryVector = await embeddings.embedQuery(embeddingQuery(question));
     const ranked = rankEntries(index, queryVector, index.length);
     const parents = ranked.slice(0, topK);
-    return ranked.filter(({ metadata: candidate }, position) => position < topK || expandSections && parents.some(({ metadata: parent }) =>
-      parent.source === candidate.source && parent.headingPath?.length
-      && (candidate.headingPath?.length ?? 0) > parent.headingPath.length
-      && parent.headingPath.every((heading, level) => candidate.headingPath?.[level] === heading),
-    ));
+    const selected = parents.map((entry, position) => ({ ...entry, rank: position + 1, via: 'hit' }));
+    if (expandSections) {
+      const addedPerHit = selected.map(() => 0);
+      let added = 0;
+      for (const entry of ranked.slice(topK)) {
+        if (added >= MAX_ADDED_SUBSECTIONS) break;
+        const candidate = entry.metadata;
+        const parentIndex = parents.findIndex(({ metadata: parent }, position) => {
+          const path = parent.headingPath;
+          return addedPerHit[position] < MAX_SUBSECTIONS_PER_HIT && parent.source === candidate.source
+            && path && path.length > 1 && (candidate.headingPath?.length ?? 0) > path.length
+            && path.every((heading, level) => candidate.headingPath?.[level] === heading);
+        });
+        if (parentIndex < 0) continue;
+        addedPerHit[parentIndex]++;
+        added++;
+        selected.push({ ...entry, rank: 0, via: `subsection of #${parentIndex + 1}` });
+      }
+    }
+    return selected;
   });
   console.log(expandSections
     ? `Context: top ${topK} expanded to ${hits.length} chunks for “${question}”:`
     : `Context: top ${hits.length} for “${question}”:`);
-  console.table(hits.map(({ metadata, similarity }, position) => ({
-    rank: position + 1,
+  console.table(hits.map(({ metadata, similarity, rank, via }) => ({
+    rank: rank || '',
+    via,
     similarity: similarity.toFixed(3),
     file: metadata.source,
     section: sectionPath(metadata.headingPath),
@@ -129,27 +157,39 @@ export async function retrieveContext(
     .join('\n\n');
 }
 
+// Ein Judge hat das verlangte Format nicht geliefert (leer, abgeschnitten, kein JSON oder falsche Form).
 export class JudgeFormatError extends Error {}
 
+// Fragt den Judge und prüft sein JSON mit `schema`. Leere, abgeschnittene oder ungültige Antworten werfen
+// `JudgeFormatError`; die Meldungen zitieren die Antwort nicht.
 export async function askJudgeJson<T>(
   model: Pick<ChatOpenAI, 'invoke'>, systemPrompt: string, userContent: string, schema: z.ZodType<T>,
+  { expectedFormat, truncationHint = "Raise the server's output limit, or use a model that thinks less." }: {
+    expectedFormat?: string; truncationHint?: string;
+  } = {},
 ): Promise<T> {
+  const formatError = (message: string) => new JudgeFormatError(`${message}${expectedFormat ? ` Expected ${expectedFormat}.` : ''}`);
   const response = await model.invoke([['system', systemPrompt], ['user', userContent]]);
   if (response.response_metadata?.finish_reason === 'length') {
-    throw new JudgeFormatError('The judge response was truncated. Increase its output token limit.');
+    throw formatError(`The judge response was truncated (finish_reason: length). ${truncationHint}`);
   }
   const text = modelText(response);
-  if (!text.trim()) throw new JudgeFormatError('The judge returned an empty answer.');
+  if (!text.trim()) throw formatError('The judge returned an empty answer.');
   let json: unknown;
   try {
     json = JSON.parse(stripJsonFence(text));
   } catch {
-    throw new JudgeFormatError('The judge did not return valid JSON.');
+    throw formatError('The judge did not return valid JSON.');
   }
   const parsed = schema.safeParse(json);
   if (!parsed.success) {
-    const fields = parsed.error.issues.map(({ path, message }) => `${path.join('.') || 'object'}: ${message}`).join('; ');
-    throw new JudgeFormatError(`The judge JSON has an unexpected shape (${fields}).`);
+    const safeFields = new Set(['reasoning', 'verdict', 'statements', 'verdicts', 'statement', 'supported', 'reason']);
+    const fields = parsed.error.issues.slice(0, 10).map(({ path, code }) => {
+      const safePath = path.map((part) => typeof part === 'number' && Number.isSafeInteger(part) && part >= 0
+        ? part : typeof part === 'string' && safeFields.has(part) ? part : '[field]').join('.');
+      return `${safePath || 'object'}: ${code}`;
+    }).join('; ');
+    throw formatError(`The judge JSON has an unexpected shape (${fields}).`);
   }
   return parsed.data;
 }
@@ -173,7 +213,15 @@ export async function answerFromContext(model: ChatOpenAI, context: string, ques
 // `userContent` sind die Daten. Die Fehlermeldungen zitieren die Antwort des Modells absichtlich
 // nicht (Regel in shared/logging.ts); die rohe Antwort zeigt Burp.
 export async function askJudge(model: ChatOpenAI, systemPrompt: string, userContent: string): Promise<Verdict> {
-  return askJudgeJson(model, systemPrompt, userContent, verdictSchema);
+  return askJudgeJson(model, systemPrompt, userContent, verdictSchema, {
+    expectedFormat: '{"reasoning": "…", "verdict": "yes" | "no"}',
+  });
+}
+
+function consoleModelText(text: string): string {
+  return stripVTControlCharacters(text).replace(/\r\n?|[\u2028\u2029]/g, '\n')
+    .replace(/[\p{Cc}\p{Cf}]/gu, (character) => character === '\n' ? '\n' : character === '\t' ? '    ' : '')
+    .split('\n').map((line) => `  | ${line}`).join('\n');
 }
 
 // Lässt den Judge einen Fall prüfen und gibt Antwort, Urteil und Begründung aus. `label` nennt den
@@ -185,11 +233,11 @@ export async function judgeAndPrint(
   text: string,
   judge: (text: string) => Promise<Verdict>,
 ): Promise<Verdict['verdict'] | undefined> {
-  console.log(`\n${label}: ${text}`);
+  console.log(`\n${label}:\n${consoleModelText(text)}`);
   try {
     // Das Label des Falls ist Metadatum; Antwort und Begründung stehen nur in der Ausgabe, nie im Log.
     const { reasoning, verdict } = await logInvocation('Judge', { model: remoteModel.name, case: label }, () => judge(text));
-    console.log(`  ${criterion}: ${verdict} – ${reasoning}`);
+    console.log(`  ${criterion}: ${verdict}\n${consoleModelText(reasoning)}`);
     return verdict;
   } catch {
     // Ein unbrauchbares Urteil ist schon protokolliert. Der andere Fall läuft trotzdem, damit du
@@ -226,10 +274,4 @@ export function reportJudgeCheck(realVerdict: Verdict['verdict'] | undefined, co
 // ("</answer_<answer_under_test>under_test>") setzt das Löschen das Tag erst zusammen.
 export function wrapUntrusted(tag: string, text: string): string {
   return `<${tag}>\n${text.replaceAll('<', '‹')}\n</${tag}>`;
-}
-
-// Kürzt einen Text für die Ausgabe auf eine Zeile.
-export function preview(text: string): string {
-  const line = text.replace(/\s+/g, ' ').trim();
-  return line.length > ANSWER_PREVIEW_LENGTH ? `${line.slice(0, ANSWER_PREVIEW_LENGTH)}…` : line;
 }
