@@ -14,9 +14,10 @@ export type ModelOutput = {
   additional_kwargs?: Record<string, unknown>;
 };
 
-// Die Denkschritte einer Modell-Antwort. Der Server schickt sie in einem eigenen Feld (`reasoning`, manche
-// Server: `reasoning_content`), nicht als `<think>` im Text; LangChain verwirft das Feld, deshalb setzen die
-// Chat-Clients `__includeRawResponse: true`, damit die Rohantwort erhalten bleibt. Ohne Denkschritte: "".
+// Die Denkschritte einer Modell-Antwort. Der Server schickt sie meist in einem eigenen Feld (`reasoning`,
+// manche Server: `reasoning_content`); ein `<think>`-Block im Text wird genauso behandelt. LangChain
+// verwirft das Feld, deshalb setzen die Chat-Clients `__includeRawResponse: true`, damit die Rohantwort
+// erhalten bleibt. Ohne Denkschritte: "".
 export function modelReasoning(output: ModelOutput): string {
   const extra = output.additional_kwargs;
   const raw = extra?.__raw_response as { choices?: { delta?: ReasoningFields; message?: ReasoningFields }[] } | undefined;

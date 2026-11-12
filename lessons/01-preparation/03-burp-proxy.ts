@@ -73,8 +73,8 @@ async function main() {
     });
   });
 
-  // Zum Ausprobieren (Aufgabe 3) einkommentieren und im Handler `invoke` + `sendChatStream(…, response, …)`
-  // ersetzen:
+  // Zum Ausprobieren (Aufgabe 3) einkommentieren und damit im Handler `invoke` +
+  // `sendChatStream(…, response, …)` ersetzen:
   //   const stream = await chatModel.stream(toPlainMessages(chatRequest.messages), { signal });
   //   await sendChatStream(chatResponse, stream, signal);
 

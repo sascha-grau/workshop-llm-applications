@@ -6,8 +6,8 @@
  * eine Zeile mit `done: true`. Die Lektionen nutzen diese Funktion statt `asStream` der Fassade. Das
  * verwirft Stücke, die nur aus Leerraum bestehen (z. B. "\n\n"), und würde so die Absätze einer
  * Antwort zusammenschieben. `source` ist ein fertiger Text oder eine fertige Modell-Antwort (beide
- * werden in einem Stück gesendet) oder ein Modell-Stream (wird Stück für Stück gesendet). Mit `options.footer` hängt die Funktion nach der
- * Antwort noch einen festen Text an (die Quellenliste der Lektionen 02 und 07). Denkschritte von
+ * werden in einem Stück gesendet) oder ein Modell-Stream (wird Stück für Stück gesendet). Mit
+ * `options.footer` hängt die Funktion nach der Antwort noch einen festen Text an (die Quellenliste der Lektionen 02 und 07). Denkschritte von
  * Reasoning-Modellen entfernt sie vorher, in beiden Fällen (`withoutThinking`). Mit SHOW_THINKING=true bleiben
  * sie stattdessen als `<think>`-Block stehen.
  */

@@ -42,10 +42,10 @@
 //
 // Aufgabe:
 //   1. Lies Kernaussage, Antwort und beide Urteile. Welche Punkte der Kernaussage nennt die
-//      Antwort, welche fehlen? Lehnt der Judge `HONEST_NO` ab (`correct: no`)? (Erwartung: "yes"
-//      für die echte Antwort, "no" für `HONEST_NO`, am Ende "Judge check passed". Mit einem
-//      kleinen Modell schwankt das Ergebnis: Es kann eine unvollständige Antwort auch ablehnen, z. B. wenn
-//      die echte Antwort nur 3 von 7 erwarteten Maßnahmen nennt (gemessen); lies beide Begründungen.)
+//      Antwort, welche fehlen? Lehnt der Judge `HONEST_NO` ab (`correct: no`)? (Gemessen mit
+//      einem 4B-Modell: `Judge check FAILED` – die echte Antwort nennt nur 3 von 7 Maßnahmen, der Judge
+//      sagt deshalb `no`; `HONEST_NO` lehnt er richtig ab. Mit einem stärkeren Modell oder einer
+//      vollständigen Antwort: `yes`/`no`, `Judge check passed`. Lies beide Begründungen.)
 //   2. Setze `QUESTION_ID` auf eine Frage, bei der Teil 1 (`npm run l08:1`) Rang 0 zeigt, also
 //      kein erwartetes Dokument in den Top-k findet. Was urteilt der Judge jetzt über die echte
 //      Antwort, und woran liegt der Fehler: an der Suche oder am Modell? (Zeigt keine Frage Rang 0,

@@ -38,8 +38,8 @@
 #        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
 # Dauer: gemessen rund 30 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
 # (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 20 Minuten, auf langsamer Hardware länger.
-# Strg+C hält an; `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed … shutting down" nach
-# Strg+C heißen nur: Diese Urteile wurden abgebrochen.
+# Strg+C hält an; `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed …
+# shutting down" nach Strg+C heißen nur: Diese Urteile wurden abgebrochen.
 #
 # Aufgabe:
 #   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).

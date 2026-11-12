@@ -16,8 +16,9 @@
 //   1. Ändere die Frage in `model.stream(...)` und starte neu.
 //   2. Setze beim ChatOpenAI-Objekt `temperature: 1.5` und frage mehrmals dasselbe. Was ändert sich?
 //      (`temperature` steuert, wie zufällig die Wortwahl ist; 0 = möglichst gleichbleibend.)
-//   3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `modelText(response)` aus (nur `.text`
-//      lässt mit SHOW_THINKING=true die Denkschritte weg). Wann siehst du die Antwort?
+//   3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `modelText(response)` aus (Import:
+//      `import { modelText } from '../shared/text.ts';`; `.text` allein ließe die Denkschritte auch mit
+//      `SHOW_THINKING=true` weg). Wann siehst du die Antwort?
 import { ChatOpenAI } from '@langchain/openai';
 import { remoteModel } from '../shared/config.ts';
 import { logInvocation } from '../shared/logging.ts';
@@ -40,10 +41,11 @@ async function main() {
   await logInvocation('Model', { model: remoteModel.name }, async () => {
     // `stream` liefert Stücke (Chunks), sobald das Modell sie erzeugt, statt auf die ganze Antwort zu warten.
     const stream = await model.stream('Erkläre in zwei Sätzen, was ein Sprachmodell ist.');
+    // `withoutThinking` lässt die Denkschritte weg; mit SHOW_THINKING=true zeigt es sie als `<think>`-Block.
     for await (const chunk of withoutThinking(stream)) {
       process.stdout.write(chunk.text);
     }
-    process.stdout.write(String.fromCharCode(10));
+    process.stdout.write('\n');
   });
 }
 
