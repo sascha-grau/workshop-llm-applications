@@ -19,6 +19,7 @@ Short decision records: context, decision, consequences. Each heading is also th
 | [full-corpus](#full-corpus) | `FULL_CORPUS = true` as default |
 | [exakter-tokenizer](#exakter-tokenizer) | Lesson 04, Part 0 counts with the local E5 tokenizer |
 | [rerank-denken](#rerank-denken) | Rerank ratings with thinking (`RERANK_THINKING`) |
+| [zeitlimits](#zeitlimits) | Timeouts take effect end to end, one capability probe per server |
 
 ## kein-structured-output
 
@@ -152,3 +153,13 @@ Short decision records: context, decision, consequences. Each heading is also th
 **Decision:** `RERANK_THINKING = true` is the default, in `05-reranking.ts`, `99-full-demo.ts` and `qdrant-retrieval.ts`. The rating calls have a 600 s timeout. Both cases go through the shared helper `createJsonChatModel` (`lessons/shared/chat-model.ts`), which sends `reasoning_effort: none` unless `thinking: true` or `SHOW_THINKING=true`; Lesson 08 uses the same helper.
 
 **Consequences:** Lesson 07, Part 9 takes minutes per question. The switch shows the trade-off live: `false` is fast, but the reranking barely reorders. A stronger model or a reranker model (see [production.md](production.md)) solves this better.
+
+## zeitlimits
+
+**Timeouts take effect end to end**
+
+**Context:** Lesson 08, Part 5 on the author's server (`qwen3.8-4b-q4`, ignores `reasoning_effort: none`) reported many errors "The judge did not answer within 600 s" (2026-11-13). Causes: (1) one run coincided with a broad server failure (embedding errors "Could not embed the question", "Request timed out."); (2) each cell probed separately whether the server supports `json_schema`, and eight parallel probes queued up (one took 239 s); (3) the message was also attached to other timeouts; (4) Node's HTTP client (undici) aborts after 300 s without response headers or data, so the configured 600 s never took effect, neither for LangChain nor through Burp nor for promptfoo.
+
+**Decision:** `lessons/shared/model-fetch.ts` raises the undici limits to the configured limit and keeps the Burp dispatcher; `chat-model.ts` and `promptfoo-judge.ts` use it, Qdrant is unaffected. The probe for structured output runs once per server and model and is shared. The message "did not answer within" appears only when our own timer expired; other timeouts say "actual timeout source unknown".
+
+**Consequences:** `timeout` in the judge block really applies. Many simultaneous `ERROR` cells including "Could not embed the question" point to an overloaded or unreachable server, not to the code. On LM Studio, Parallel 1 helps.

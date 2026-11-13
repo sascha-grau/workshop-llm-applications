@@ -6,13 +6,29 @@ import type { ChatOpenAI } from '@langchain/openai';
 import type { AssertionValueFunctionContext, GradingResult } from 'promptfoo';
 import { loadApiProvider } from 'promptfoo';
 import { z } from 'zod';
+import { settings } from '../shared/config.ts';
 import { askJudgeJson, JudgeFormatError, wrapUntrusted } from './evaluation.ts';
 import JudgeProvider from './promptfoo-judge.ts';
 
 const statementsSchema = z.strictObject({ statements: z.array(z.string().trim().min(1)) });
-// Modelle, bei denen strukturierte Ausgabe nicht klappte: Sie bleiben beim Klartext-Prompt, damit nicht jeder
-// Aufruf erst scheitert. Die Menge hängt am Modellobjekt, nicht am Server.
-const plainJsonModels = new WeakSet<Pick<ChatOpenAI, 'invoke'>>();
+// Ob der Server strukturierte Ausgabe (`json_schema`) kann, merkt sich je Server und Modell eine gemeinsame
+// Probe: Eine Probe je Zelle würde sich auf dem Server stauen. Danach gilt der Modus (Schema oder Klartext).
+type JudgeFormatState = { mode: 'unknown' | 'schema' | 'plain'; pending?: Promise<void> };
+const modelFormats = new WeakMap<Pick<ChatOpenAI, 'invoke'>, JudgeFormatState>();
+const endpointFormats = new Map<string, JudgeFormatState>();
+
+function formatFor(model: Pick<ChatOpenAI, 'invoke'>): JudgeFormatState {
+  const existing = modelFormats.get(model);
+  if (existing) return existing;
+  const connected = model as Partial<Pick<ChatOpenAI, 'model' | 'clientConfig'>>;
+  const baseURL = connected.clientConfig?.baseURL;
+  const key = typeof baseURL === 'string' && typeof connected.model === 'string'
+    ? JSON.stringify([new URL(baseURL).href.replace(/\/+$/, ''), connected.model]) : undefined;
+  const state = (key && endpointFormats.get(key)) || { mode: 'unknown' as const };
+  modelFormats.set(model, state);
+  if (key) endpointFormats.set(key, state);
+  return state;
+}
 
 const EXTRACT_PROMPT =
   'Zerlege die Antwort in <answer_under_test> in atomare, eigenständig verständliche Tatsachenaussagen. ' +
@@ -39,31 +55,54 @@ async function askWithRetry<T>(
   model: Pick<ChatOpenAI, 'invoke'>, stage: string, prompt: string, content: string, schema: z.ZodType<T>,
   timeout?: number,
 ): Promise<T> {
+  const state = formatFor(model);
+  const useSchema = !settings.showThinking;
+  if (useSchema && state.pending) await state.pending;
+  const probe = useSchema && state.mode === 'unknown' ? Promise.withResolvers<void>() : undefined;
+  if (probe) {
+    state.pending = probe.promise;
+    void probe.promise.catch(() => {});
+  }
+  const releaseProbe = () => {
+    if (probe && state.pending === probe.promise) state.pending = undefined;
+  };
   let feedback = '';
   // Zwei Formatversuche, dazu ein Versuch für den Rückfall von strukturierter Ausgabe auf Klartext.
   let maxAttempts = 2;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await askJudgeJson(model, prompt, content + feedback, schema, {
-        timeout,
-        jsonSchema: !plainJsonModels.has(model),
-        truncationHint: "Raise max_tokens in the judge block of the YAML (Part 5) or the server's output limit, or use a model that thinks less.",
-      });
-    } catch (error) {
-      if (!(error instanceof JudgeFormatError)) throw error;
-      if (error.retryWithoutSchema) {
-        plainJsonModels.add(model);
-        maxAttempts = 3;
-        feedback = '';
-        continue;
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await askJudgeJson(model, prompt, content + feedback, schema, {
+          timeout,
+          jsonSchema: state.mode !== 'plain',
+          truncationHint: "Raise max_tokens in the judge block of the YAML (Part 5) or the server's output limit, or use a model that thinks less.",
+        });
+        if (useSchema && state.mode === 'unknown') state.mode = 'schema';
+        probe?.resolve();
+        releaseProbe();
+        return result;
+      } catch (error) {
+        if (!(error instanceof JudgeFormatError)) throw error;
+        if (error.retryWithoutSchema) {
+          state.mode = 'plain';
+          probe?.resolve();
+          releaseProbe();
+          maxAttempts = 3;
+          feedback = '';
+          continue;
+        }
+        if (attempt === maxAttempts) {
+          throw new JudgeFormatError(`judge format error (${stage}) after ${maxAttempts} attempts: ${error.message}`);
+        }
+        feedback = `\n\nFormatkontrolle fehlgeschlagen: ${error.message} Wiederhole die Aufgabe vollständig im verlangten JSON-Format.`;
       }
-      if (attempt === maxAttempts) {
-        throw new JudgeFormatError(`judge format error (${stage}) after ${maxAttempts} attempts: ${error.message}`);
-      }
-      feedback = `\n\nFormatkontrolle fehlgeschlagen: ${error.message} Wiederhole die Aufgabe vollständig im verlangten JSON-Format.`;
     }
+    throw new JudgeFormatError(`judge format error (${stage}): no usable verdict`);
+  } catch (error) {
+    probe?.reject(error);
+    releaseProbe();
+    throw error;
   }
-  throw new JudgeFormatError(`judge format error (${stage}): no usable verdict`);
 }
 
 export async function evaluateFaithfulness(

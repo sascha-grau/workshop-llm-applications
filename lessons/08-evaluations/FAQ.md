@@ -86,7 +86,8 @@ Sometimes the judge is wrong too and marks a supported statement as unsupported.
 | `[FAIL]` | At least one check failed. The cell shows every check's reason. | Find out _which_ check failed (see below). |
 | `[ERROR]` with `judge format error` | The judge returned no valid JSON even after several attempts. This says nothing about the answer. | Accept single cases (rare with structured output); if there are many, use a stronger model as judge. |
 | `[ERROR]` with `Context size has been exceeded` | LM Studio serves several requests in parallel, and the context is not enough for each. | Load the chat model with Parallel 1 ([Check first](GUIDE.md#check-first) in the guide). |
-| `[ERROR]` with `did not answer within … s` | The judge was too slow. | Raise `timeout` in the judge block of the YAML file. |
+| `[ERROR]` with `did not answer within … s` | Our own timer expired: the server is too slow or queues requests. | Raise `timeout` in the judge block of the YAML file; on LM Studio load the model with Parallel 1. |
+| Many `[ERROR]` cells at once, also `Could not embed the question` | The server is overloaded or unreachable; this is not a code error. | Check the server and rerun. |
 | `[ERROR]` with `Cannot load index` | An index is missing. | Build the indexes from Lesson 04 (`npm run l04:0` to `l04:4`). |
 
 If there are `[ERROR]` cells, `npm run l08:5` exits with code 100 and prints a stack trace per error. That is not a crash; the results and the HTML report are written anyway.

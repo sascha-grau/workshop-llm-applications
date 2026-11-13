@@ -144,6 +144,15 @@ export class JudgeFormatError extends Error {
   }
 }
 
+// Merkt sich, welcher Abbruch unser eigener Zeitgeber war. Nur dann heißt die Meldung "did not answer within";
+// ein Zeitlimit, das irgendwo im Netz oder Server abläuft, soll nicht so aussehen.
+const judgeTimeoutReasons = new WeakMap<object, number>();
+
+export function isJudgeTimeout(error: unknown, timeout?: number): boolean {
+  const duration = typeof error === 'object' && error !== null ? judgeTimeoutReasons.get(error) : undefined;
+  return duration !== undefined && (timeout === undefined || duration === timeout);
+}
+
 // Fragt den Judge und prüft sein JSON mit `schema`. Leere, abgeschnittene oder ungültige Antworten werfen
 // `JudgeFormatError`; die Meldungen zitieren die Antwort nicht. Mit `jsonSchema` (nur bei ausgeschaltetem Denken)
 // wird strukturierte Ausgabe verlangt; sonst, oder nach `retryWithoutSchema`, gilt der Klartext-Prompt.
@@ -171,7 +180,10 @@ export async function askJudgeJson<T>(
       },
     } : {}),
   }).catch((error) => {
-    if (signal?.aborted) throw signal.reason;
+    if (signal?.aborted && timeout !== undefined) {
+      judgeTimeoutReasons.set(signal.reason, timeout);
+      throw signal.reason;
+    }
     if (useJsonSchema && error instanceof SyntaxError) throw formatError('The judge did not return valid JSON.');
     if (useJsonSchema && error instanceof Error && error.constructor.name === 'LengthFinishReasonError') throw truncated();
     if (useJsonSchema && error instanceof Error && 'status' in error && (error.status === 400 || error.status === 422)

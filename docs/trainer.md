@@ -108,6 +108,7 @@ Many tasks change constants. If one stays changed, it skews later lessons. Quick
 | "The chunk manifest is invalid or outdated" | Old chunks or `TOKEN_LIMIT_OVERRIDE` changed | Set `TOKEN_LIMIT_OVERRIDE` to `undefined`. If `chunks-512/` exists: delete the new `chunks/` and rename `chunks-512/` back; otherwise delete `chunks/` and run `npm run l04:0` |
 | "The Qdrant collection … does not exist" | Fresh container | `npm run l06:1` |
 | L07, Parts 8–11 search the wrong index | `INDEX_STRATEGY` in `hybrid.ts` not reset after L06, Part 2 | set to `'headings'` |
+| Many `[ERROR]` cells in L08, Part 5, also "Could not embed the question" | Server overloaded or unreachable | Check the server and rerun; for "did not answer within … s" raise `timeout` in the judge block, on LM Studio use Parallel 1 ([zeitlimits](decisions.md#zeitlimits)) |
 | promptfoo ends with exit code 100 and a stack trace | Cells with ERROR ("judge format error") | Not a crash; the report is written |
 | `npx promptfoo view` reachable on Wi-Fi | Listens on all interfaces (header of `05-promptfoo-strategies.yaml`) | Ctrl+C after viewing |
 

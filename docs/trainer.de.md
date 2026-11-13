@@ -108,6 +108,7 @@ Viele Aufgaben ändern Konstanten. Bleibt eine geändert, verfälscht sie späte
 | "The chunk manifest is invalid or outdated" | Alte Chunks oder `TOKEN_LIMIT_OVERRIDE` geändert | `TOKEN_LIMIT_OVERRIDE` auf `undefined`. Existiert `chunks-512/`: die neuen `chunks/` löschen und `chunks-512/` zurückbenennen; sonst `chunks/` löschen und `npm run l04:0` |
 | "The Qdrant collection … does not exist" | Frischer Container | `npm run l06:1` |
 | L07, Teil 8–11 suchen im falschen Index | `INDEX_STRATEGY` in `hybrid.ts` nach L06, Teil 2 nicht zurückgesetzt | auf `'headings'` |
+| Viele `[ERROR]`-Zellen in L08, Teil 5, auch "Could not embed the question" | Server überlastet oder nicht erreichbar | Server prüfen, Lauf neu starten; bei "did not answer within … s" `timeout` im Judge-Block erhöhen, auf LM Studio Parallel 1 ([zeitlimits](decisions.de.md#zeitlimits)) |
 | promptfoo endet mit Exit-Code 100 und Stacktrace | Zellen mit ERROR ("judge format error") | Kein Absturz; Bericht ist geschrieben |
 | `npx promptfoo view` im WLAN erreichbar | Lauscht auf allen Schnittstellen (Kopf von `05-promptfoo-strategies.yaml`) | Nach dem Ansehen Strg+C |
 

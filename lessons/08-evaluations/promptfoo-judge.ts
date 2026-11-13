@@ -5,7 +5,8 @@
 import { loadApiProvider, loadApiProviders } from 'promptfoo';
 import type { ApiProvider, ProviderOptions, ProviderResponse } from 'promptfoo';
 import { settings } from '../shared/config.ts';
-import { createChatModel } from './evaluation.ts';
+import { withModelFetchTimeout } from '../shared/model-fetch.ts';
+import { createChatModel, isJudgeTimeout } from './evaluation.ts';
 
 export default class JudgeProvider implements ApiProvider {
   readonly timeout: number;
@@ -77,12 +78,17 @@ export default class JudgeProvider implements ApiProvider {
   // promptfoos OpenAI-Adapter wirft nicht, sondern liefert Text in `response.error`, etwa
   // "API call error: Error: Request timed out after … ms". Nur genau dieser Wortlaut (verankert)
   // wird zur klaren Meldung; jeder andere Fehler bleibt unverändert, auch wenn er "timed out" enthält.
-  throwIfTimedOut(error: unknown): void {
+  // "did not answer within" nur, wenn unser eigener Zeitgeber ablief (`localDeadlineExpired`); andere Zeitlimits
+  // melden wir ehrlich als unbekannte Quelle.
+  throwIfTimedOut(error: unknown, localDeadlineExpired = false): void {
+    if (localDeadlineExpired || isJudgeTimeout(error, this.timeout)) {
+      throw new Error(`The judge did not answer within ${this.timeout / 1000} s (timeout in the judge block of the YAML).`);
+    }
     const name = error instanceof Error ? error.name : '';
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
     if (name === 'TimeoutError' || name === 'APIConnectionTimeoutError'
       || /^(?:API call error: (?:Error: )?)?Request timed out(?: after \d+ ms)?\.?$/.test(message)) {
-      throw new Error(`The judge did not answer within ${this.timeout / 1000} s (timeout in the judge block of the YAML).`);
+      throw new Error(`The judge request timed out (local limit: ${this.timeout / 1000} s; actual timeout source unknown).`);
     }
   }
 
@@ -116,13 +122,14 @@ export default class JudgeProvider implements ApiProvider {
     const callerSignal = args[2]?.abortSignal;
     const abortSignal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
     try {
-      const response = await provider.callApi(args[0], args[1], { ...args[2], abortSignal });
-      if (deadline.aborted && !callerSignal?.aborted) this.throwIfTimedOut(deadline.reason);
+      const response = await withModelFetchTimeout(this.timeout, () =>
+        provider.callApi(args[0], args[1], { ...args[2], abortSignal }));
+      if (deadline.aborted && !callerSignal?.aborted) this.throwIfTimedOut(deadline.reason, true);
       this.throwIfTimedOut(response.error);
       return response;
     } catch (error) {
       if (!callerSignal?.aborted) {
-        if (deadline.aborted) this.throwIfTimedOut(deadline.reason);
+        if (deadline.aborted) this.throwIfTimedOut(deadline.reason, true);
         this.throwIfTimedOut(error);
       }
       throw error;

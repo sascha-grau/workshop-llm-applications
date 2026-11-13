@@ -86,7 +86,8 @@ Manchmal irrt auch der Judge und markiert eine belegte Aussage als ungedeckt. Im
 | `[FAIL]` | Mindestens eine Prüfung ist gescheitert. Die Zelle zeigt die Begründung jeder Prüfung. | Prüfen, _welche_ Prüfung scheiterte (siehe unten). |
 | `[ERROR]` mit `judge format error` | Der Judge hat auch nach mehreren Versuchen kein gültiges JSON geliefert. Das sagt nichts über die Antwort. | Einzelfälle hinnehmen (mit strukturierter Ausgabe selten); bei vielen ein stärkeres Modell als Judge nehmen. |
 | `[ERROR]` mit `Context size has been exceeded` | LM Studio bedient mehrere Anfragen parallel, und der Kontext reicht nicht für jede. | Das Chat-Modell mit Parallel 1 laden ([Vorher prüfen](GUIDE.de.md#vorher-prüfen) im Guide). |
-| `[ERROR]` mit `did not answer within … s` | Der Judge war zu langsam. | `timeout` im Judge-Block der YAML-Datei erhöhen. |
+| `[ERROR]` mit `did not answer within … s` | Der eigene Zeitgeber lief ab: Der Server ist zu langsam oder staut Anfragen. | `timeout` im Judge-Block der YAML-Datei erhöhen; auf LM Studio das Modell mit Parallel 1 laden. |
+| Viele `[ERROR]`-Zellen auf einmal, auch `Could not embed the question` | Der Server ist überlastet oder nicht erreichbar; das ist kein Fehler im Code. | Server prüfen, Lauf neu starten. |
 | `[ERROR]` mit `Cannot load index` | Ein Index fehlt. | Die Indizes aus Lektion 04 erzeugen (`npm run l04:0` bis `l04:4`). |
 
 Gibt es `[ERROR]`-Zellen, endet `npm run l08:5` mit Exit-Code 100 und zeigt einen Stacktrace je Fehler. Das ist kein Absturz; Ergebnisse und HTML-Bericht werden trotzdem geschrieben.

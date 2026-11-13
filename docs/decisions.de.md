@@ -19,6 +19,7 @@ Kurze Entscheidungsprotokolle: Kontext, Entscheidung, Folgen. Jede Überschrift 
 | [full-corpus](#full-corpus) | `FULL_CORPUS = true` als Standard |
 | [exakter-tokenizer](#exakter-tokenizer) | Lektion 04, Teil 0 zählt mit dem lokalen E5-Tokenizer |
 | [rerank-denken](#rerank-denken) | Reranking-Bewertungen mit Denkschritten (`RERANK_THINKING`) |
+| [zeitlimits](#zeitlimits) | Zeitlimits wirken durchgängig, Fähigkeits-Probe je Server |
 
 ## kein-structured-output
 
@@ -151,3 +152,13 @@ Kurze Entscheidungsprotokolle: Kontext, Entscheidung, Folgen. Jede Überschrift 
 **Entscheidung:** `RERANK_THINKING = true` ist der Standard, in `05-reranking.ts`, `99-full-demo.ts` und `qdrant-retrieval.ts`. Die Bewertungsaufrufe haben 600 s Zeitlimit. Beide Fälle laufen über den gemeinsamen Helfer `createJsonChatModel` (`lessons/shared/chat-model.ts`), der `reasoning_effort: none` sendet, außer bei `thinking: true` oder `SHOW_THINKING=true`; Lektion 08 nutzt denselben Helfer.
 
 **Folgen:** Lektion 07, Teil 9 braucht pro Frage Minuten. Der Schalter zeigt den Zielkonflikt live: `false` ist schnell, aber das Reranking sortiert kaum um. Ein stärkeres Modell oder ein Reranker-Modell (siehe [production.de.md](production.de.md)) löst das besser.
+
+## zeitlimits
+
+**Zeitlimits wirken durchgängig**
+
+**Kontext:** Lektion 08, Teil 5 auf dem Server des Autors (`qwen3.8-4b-q4`, ignoriert `reasoning_effort: none`) meldete viele Fehler "The judge did not answer within 600 s" (2026-11-13). Ursachen: (1) ein Lauf fiel mit einem breiten Serverausfall zusammen (Embedding-Fehler "Could not embed the question", "Request timed out."); (2) jede Zelle prüfte einzeln, ob der Server `json_schema` kann, acht parallele Proben stauten sich (eine brauchte 239 s); (3) die Meldung hing auch an anderen Zeitlimits; (4) Node-HTTP (undici) bricht nach 300 s ohne Antwortkopf oder Daten ab, die eingestellten 600 s wirkten also nie, weder bei LangChain noch über Burp noch bei promptfoo.
+
+**Entscheidung:** `lessons/shared/model-fetch.ts` hebt die undici-Grenzen auf das eingestellte Limit an und behält den Burp-Dispatcher; `chat-model.ts` und `promptfoo-judge.ts` nutzen es, Qdrant bleibt unberührt. Die Probe auf strukturierte Ausgabe läuft je Server und Modell einmal und wird geteilt. Die Meldung "did not answer within" erscheint nur, wenn der eigene Zeitgeber ablief; andere Zeitlimits heißen "actual timeout source unknown".
+
+**Folgen:** `timeout` im Judge-Block gilt wirklich. Viele gleichzeitige `ERROR`-Zellen samt "Could not embed the question" deuten auf einen überlasteten oder nicht erreichbaren Server, nicht auf den Code. Auf LM Studio hilft Parallel 1.

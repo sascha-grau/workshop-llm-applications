@@ -12,16 +12,17 @@ import JudgeProvider from '../lessons/08-evaluations/promptfoo-judge.ts';
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/faithfulness-judge.json', import.meta.url), 'utf8'));
 const statementsSchema = z.strictObject({ statements: z.array(z.string().trim().min(1)) });
 
-function replay(rawResponses: unknown[]) {
+let replaySequence = 0;
+function replay(rawResponses: unknown[], modelName = `test-judge-${++replaySequence}`, baseURL = 'http://localhost:1234/v1') {
   const requests: Record<string, any>[] = [];
   const model = createChatModel({
-    model: 'qwen3.5-4b', apiKey: 'not-required', baseURL: 'http://localhost:1234/v1',
+    model: modelName, apiKey: 'not-required', baseURL,
     maxTokens: 8192, timeout: 600_000,
   });
   model.completions.clientConfig.fetch = async (_input, init) => {
     requests.push(JSON.parse(String(init?.body)));
     assert.ok(rawResponses.length, 'Unexpected extra judge call');
-    const response = rawResponses.shift();
+    const response = await rawResponses.shift();
     if (response instanceof Error) throw response;
     if (response instanceof Response) return response;
     return new Response(JSON.stringify(response), { headers: { 'content-type': 'application/json' } });
@@ -287,4 +288,87 @@ test('a truncation before schema incompatibility keeps the total request budget 
   const failure = replay([truncated, completion(''), completion('{')]);
   await assert.rejects(evaluateFaithfulness(failure.model, 'answer', 'context'), /after 3 attempts.*valid JSON/);
   assert.equal(failure.requests.length, 3);
+});
+
+async function requestStarted(requests: unknown[]) {
+  for (let turn = 0; turn < 100 && requests.length === 0; turn++) await new Promise(setImmediate);
+  assert.equal(requests.length, 1);
+}
+
+test('distinct model instances share one initial capability probe and reuse plain mode by endpoint and model', async () => {
+  const author = JSON.parse(readFileSync(new URL('./fixtures/faithfulness-judge-reasoning.json', import.meta.url), 'utf8'));
+  const pending = Promise.withResolvers<unknown>();
+  const first = replay([pending.promise, completion('{"statements":[]}')], 'shared-author');
+  const second = replay([completion('{"statements":[]}')], 'shared-author', 'http://localhost:1234/v1/');
+  const firstCall = evaluateFaithfulness(first.model, 'answer', 'context');
+  await requestStarted(first.requests);
+  const secondCall = evaluateFaithfulness(second.model, 'answer', 'context');
+  await new Promise(setImmediate);
+  assert.equal(second.requests.length, 0);
+  pending.resolve(author.reasoningOnly);
+  const results = await Promise.all([firstCall, secondCall]);
+  assert.ok(results.every(result => result.pass));
+  assert.equal(first.requests.length, 2);
+  assert.equal(first.requests[0].response_format.type, 'json_schema');
+  assert.equal(first.requests[1].response_format, undefined);
+  assert.equal(second.requests.length, 1);
+  assert.equal(second.requests[0].response_format, undefined);
+  for (const [modelName, baseURL, expectedStructured] of [
+    ['shared-author', 'http://localhost:1234/v1', false],
+    ['shared-author', 'http://localhost:1234/another-server/v1', true],
+    ['different-model', 'http://localhost:1234/v1', true],
+  ] as const) {
+    const next = replay([completion('{"statements":[]}')], modelName, baseURL);
+    assert.equal((await evaluateFaithfulness(next.model, 'answer', 'context')).pass, true);
+    assert.equal(!!next.requests[0].response_format, expectedStructured);
+  }
+});
+
+test('successful structured capability releases waiters without disabling LM Studio schema requests', async () => {
+  const pending = Promise.withResolvers<unknown>();
+  const first = replay([pending.promise], 'shared-supported');
+  const second = replay([completion('{"statements":[]}')], 'shared-supported');
+  const firstCall = evaluateFaithfulness(first.model, 'answer', 'context');
+  await requestStarted(first.requests);
+  const secondCall = evaluateFaithfulness(second.model, 'answer', 'context');
+  await new Promise(setImmediate);
+  assert.equal(second.requests.length, 0);
+  pending.resolve(completion('{"statements":[]}'));
+  assert.ok((await Promise.all([firstCall, secondCall])).every(result => result.pass));
+  assert.equal(first.requests[0].response_format.type, 'json_schema');
+  assert.equal(second.requests[0].response_format.type, 'json_schema');
+});
+
+test('a failed capability probe releases waiters as errors and never caches transport failure as plain mode', async () => {
+  const pending = Promise.withResolvers<unknown>();
+  const first = replay([pending.promise], 'shared-transport');
+  const second = replay([], 'shared-transport');
+  const firstCall = evaluateFaithfulness(first.model, 'answer', 'context');
+  await requestStarted(first.requests);
+  const secondCall = evaluateFaithfulness(second.model, 'answer', 'context');
+  const resultsPromise = Promise.allSettled([firstCall, secondCall]);
+  pending.reject(new Error('connection unavailable'));
+  const results = await resultsPromise;
+  assert.ok(results.every(result => result.status === 'rejected' && !(result.reason instanceof JudgeFormatError)));
+  assert.equal(first.requests.length, 1);
+  assert.equal(second.requests.length, 0);
+  const recovered = replay([completion('{"statements":[]}')], 'shared-transport');
+  assert.equal((await evaluateFaithfulness(recovered.model, 'answer', 'context')).pass, true);
+  assert.equal(recovered.requests[0].response_format.type, 'json_schema');
+});
+
+test('showing reasoning does not learn unsupported structured capability for a later model instance', async t => {
+  const previous = process.env.SHOW_THINKING;
+  t.after(() => {
+    if (previous === undefined) delete process.env.SHOW_THINKING;
+    else process.env.SHOW_THINKING = previous;
+  });
+  process.env.SHOW_THINKING = 'true';
+  const plain = replay([completion('{"statements":[]}')], 'thinking-capability');
+  assert.equal((await evaluateFaithfulness(plain.model, 'answer', 'context')).pass, true);
+  assert.equal(plain.requests[0].response_format, undefined);
+  process.env.SHOW_THINKING = 'false';
+  const structured = replay([completion('{"statements":[]}')], 'thinking-capability');
+  assert.equal((await evaluateFaithfulness(structured.model, 'answer', 'context')).pass, true);
+  assert.equal(structured.requests[0].response_format.type, 'json_schema');
 });

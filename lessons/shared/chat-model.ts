@@ -5,6 +5,7 @@
 // Entscheidung: docs/decisions.de.md#rerank-denken
 import { ChatOpenAI, type ChatOpenAIFields } from '@langchain/openai';
 import { remoteModel, settings } from './config.ts';
+import { modelFetch } from './model-fetch.ts';
 
 export function createJsonChatModel({
   model = remoteModel.name, apiKey = remoteModel.apiKey, temperature = 0,
@@ -19,6 +20,10 @@ export function createJsonChatModel({
     __includeRawResponse: true,
     ...options,
     modelKwargs: { ...(thinking || settings.showThinking ? {} : { reasoning_effort: 'none' }), ...modelKwargs },
-    configuration: { baseURL: configuration?.baseURL ?? remoteModel.baseURL, ...configuration },
+    configuration: {
+      baseURL: configuration?.baseURL ?? remoteModel.baseURL,
+      ...configuration,
+      fetch: modelFetch(Math.max(options.timeout ?? 600_000, configuration?.timeout ?? 0), configuration?.fetch),
+    },
   });
 }
