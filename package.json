@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
     "@langchain/openai": "^1.8.2",
     "@qdrant/js-client-rest": "^1.20.0",
     "cheerio": "^1.2.0",
@@ -13,7 +14,10 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "check": "npm run typecheck && npm run docs:check && node --test scripts/*.test.ts",
+    "docs:check": "node scripts/check-docs.ts",
     "typecheck": "tsc --noEmit -p .",
+    "tokenizer:fetch": "node scripts/fetch-tokenizer.ts",
     "l01:1": "node --env-file-if-exists=.env lessons/01-preparation/01-hello-llm.ts",
     "l01:2": "node --env-file-if-exists=.env lessons/01-preparation/02-open-webui.ts",
     "l01:3": "node --env-file-if-exists=.env lessons/01-preparation/03-burp-proxy.ts",

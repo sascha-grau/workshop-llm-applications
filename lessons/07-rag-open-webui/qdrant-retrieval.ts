@@ -1,12 +1,7 @@
-// Suche über Qdrant für Teil 8 bis 10 von Lektion 07: Hybrid-Suche (BM25 + Vektor, RRF), Reranking
-// und Multi-Query aus Lektion 06. Die Funktionen sind `Retrieve`-Fabriken wie in `retrieval.ts`; der
-// Index-Parameter bleibt ungenutzt (leer), denn die Chunks liegen in der Collection aus Lektion 06,
-// Teil 1. Aufgaben, die sonst `loadRagIndex` erledigt (nur öffentliche Chunks), übernimmt hier
-// `PUBLIC_FILTER`.
-//
-// Logging-Regel (siehe shared/logging.ts): Fragen, Antworten und Chunk-Texte kommen nie ins Log.
-// Die Aufrufe unten protokollieren nur Zahlen (Anzahl und Länge der Fassungen, Länge der Frage,
-// Punkt-IDs), keine Texte.
+// Trefferauswahl in Qdrant für Teil 8 bis 10: Hybrid-Suche, Reranking und Multi-Query aus Lektion 06.
+// Der Index-Parameter von `Retrieve` bleibt leer; die Chunks liegen in der Collection aus `npm run l06:1`.
+// Fragen, Antworten und Chunk-Texte kommen nie ins Log, nur Zahlen und Punkt-IDs (shared/logging.ts).
+// Erklärt: lessons/07-rag-open-webui/GUIDE.de.md
 import { modelText, stripJsonFence } from '../shared/text.ts';
 import { z } from 'zod';
 import { getQdrantClient, requireCollection, getCollectionName } from '../06-hybrid-rerank/hybrid.ts';
@@ -15,35 +10,30 @@ import { embeddingQuery } from '../shared/embeddings.ts';
 import { INTERNAL_DOCUMENTS, indexEntrySchema } from '../shared/index.ts';
 import { isAbortError, log, logInvocation } from '../shared/logging.ts';
 import { remoteModel } from '../shared/config.ts';
+import { createJsonChatModel } from '../shared/chat-model.ts';
 import { embedRagQuestions, type RagSource, type RetrievalContext, type Retrieve } from './rag.ts';
 
 export { requireCollection, getCollectionName };
 
-// Der Pre-Filter für Qdrant: nur Zugriffsgruppe `public`, und nie ein Dokument aus
-// `INTERNAL_DOCUMENTS`. Er muss an jede Teilsuche (`prefetch`) und an die fusionierte Anfrage:
-// Ein Filter an der äußeren Anfrage allein käme zu spät, denn die Kandidatenlisten würden
-// ungefiltert gebildet, und die Fusion könnte interne Chunks enthalten oder die Listen mit Treffern
-// füllen, die danach wegfallen. So wirkt der Filter vor der Suche, wie in Lektion 05, Teil 3.
+// Sicherheit: Pre-Filter wie `loadRagIndex`, an jeder Teilsuche (`prefetch`) und an der Fusion. Nur
+// außen wäre zu spät: Die Kandidatenlisten enthielten interne Chunks. Siehe docs/decisions.de.md#pre-filter
 export const PUBLIC_FILTER = {
   must: [{ key: 'accessGroup', match: { value: 'public' } }],
   must_not: INTERNAL_DOCUMENTS.map((source) => ({ key: 'source', match: { value: source } })),
 };
 
-// Prüft die Payload eines Qdrant-Punkts: Chunk-Text plus Metadaten (wie im Index aus Lektion 04).
+// Chunk-Text plus Metadaten, wie im Index aus Lektion 04.
 const payloadSchema = z.object({ text: indexEntrySchema.shape.text, ...indexEntrySchema.shape.metadata.shape });
 type Hit = { id: string | number; score: number; payload?: unknown };
 
-// Wandelt einen Qdrant-Treffer in eine Quelle für den Kontext um (Text und Metadaten); die Payload
-// wird dabei geprüft, ein beschädigter Punkt wirft einen Fehler.
+// Ein beschädigter Punkt wirft einen Fehler, statt halbe Daten in den Prompt zu legen.
 export function sourceFromHit(hit: Hit): RagSource {
   const { text, ...metadata } = payloadSchema.parse(hit.payload);
   return { text, metadata };
 }
 
-// Eine Hybrid-Anfrage an Qdrant: `prefetch` holt zwei Kandidatenlisten (BM25 über das Textfeld mit
-// dem Fragetext, Vektorsuche mit `queryVector`), je `candidatesPerList`; Qdrant fusioniert sie mit
-// RRF und gibt `limit` Treffer zurück. `abortable` bricht das Warten ab, wenn Open WebUI die
-// Anfrage abbricht (der Qdrant-Client kennt kein Signal).
+// Eine Anfrage: zwei Kandidatenlisten (BM25 über den Fragetext, Vektor), Fusion mit RRF in Qdrant.
+// Der Qdrant-Client kennt kein Abbruch-Signal; `abortable` hört nur auf zu warten.
 export async function hybridSearch(
   queryVector: number[], context: RetrievalContext, limit: number, candidatesPerList: number, rrfK: number,
 ): Promise<Hit[]> {
@@ -60,31 +50,34 @@ export async function hybridSearch(
   return result.points;
 }
 
-// Hybrid-Suche als Trefferauswahl (Lektion 06, Teil 4).
 export const hybridRetrieval = (candidatesPerList: number, rrfK: number): Retrieve =>
   async (_index, queryVector, topK, context) =>
     (await hybridSearch(queryVector, context, topK, candidatesPerList, rrfK)).map(sourceFromHit);
 
-// Antwortformat der Bewertung: eine ganze Zahl von 0 bis 10.
 const ratingSchema = z.object({ score: z.number().int().min(0).max(10) });
-// Liest JSON aus einer Modellantwort. Kleine Modelle verpacken es oft in einen ```json-Block;
-// den entfernt die Funktion vorher.
+// Großzügiges Zeitlimit statt des kurzen Standards: LM Studio arbeitet die parallelen Bewertungen nacheinander
+// ab, und denkende Aufrufe warten sonst in der Warteschlange ins Zeitlimit.
+const RERANK_TIMEOUT_MS = 600_000;
+// Standard: true. Das Modell denkt vor jeder Bewertung: sinnvolle Noten, aber langsam.
+// false = `reasoning_effort: none`: schnell, doch der kleine Judge bewertet fast alles mit 0.
+// Gedacht zum Umschalten und Vergleichen (docs/decisions.de.md#rerank-denken).
+const RERANK_THINKING = true;
+// Kleine Modelle verpacken JSON oft in einen ```json-Block.
 const jsonFromAnswer = (answer: string) =>
   JSON.parse(stripJsonFence(answer));
 
-// Reranking (Lektion 06, Teil 5): holt `candidates` Treffer per Hybrid-Suche, lässt das Chat-Modell
-// jeden einzeln bewerten (pointwise, parallel, nur die ersten `textLimit` Zeichen) und behält die
-// besten `topK`. Eine fehlgeschlagene Bewertung (kein gültiges JSON) zählt als -1: Der Chunk
-// fällt ans Ende, die Antwort bricht nicht ab. Ein Abbruch durch Open WebUI dagegen wird weitergereicht.
+// Reranking (Lektion 06, Teil 5), pointwise und parallel. Eine ungültige Bewertung zählt als -1: Der
+// Chunk fällt ans Ende, statt die Antwort abzubrechen. Das Log zeigt nur Punkt-IDs, die Zahl sieht Burp.
 export const rerankRetrieval = (candidates: number, textLimit: number, candidatesPerList: number, rrfK: number): Retrieve =>
   async (_index, queryVector, topK, context) => {
-    const { question, chatModel, signal } = context;
+    const { question, signal } = context;
     const hybrid = await hybridSearch(queryVector, context, candidates, candidatesPerList, rrfK);
+    const ratingModel = createJsonChatModel({ thinking: RERANK_THINKING, timeout: RERANK_TIMEOUT_MS });
     const rated = await Promise.all(hybrid.map(async (hit) => {
       const source = sourceFromHit(hit);
       const rating = await logInvocation('LLM reranking', { model: remoteModel.name, point: hit.id }, async () => {
         signal.throwIfAborted();
-        const response = await chatModel.invoke(
+        const response = await ratingModel.invoke(
           'Wie gut beantwortet der Abschnitt die Frage? Vergib eine ganze Zahl von 0 (gar nicht) bis 10 (vollständig). ' +
           'Antworte ausschließlich mit einem JSON-Objekt im Format {"score": 7}.\n\n' +
           `Frage: ${question}\n\nAbschnitt:\n${source.text.slice(0, textLimit)}`,
@@ -101,10 +94,8 @@ export const rerankRetrieval = (candidates: number, textLimit: number, candidate
     return rated.toSorted((a, b) => b.score - a.score).slice(0, topK).map(({ source }) => source);
   };
 
-// Multi-Query (Lektion 06, Teil 6): Das Chat-Modell formuliert die Frage `variantCount`-mal um, die
-// Originalfrage und jede Fassung werden mit je einer Vektorsuche gesucht, Qdrant fusioniert alle
-// Listen mit RRF. Anders als bei der Hybrid-Suche läuft hier kein BM25. Ein Fehler beim
-// Umformulieren (z. B. falsche Zahl von Fassungen) bricht die Frage ab.
+// Multi-Query (Lektion 06, Teil 6): nur Vektorsuche, kein BM25. Die Originalfrage bleibt eine Liste,
+// damit abdriftende Fassungen sie nicht verdrängen. Ungültiges JSON beim Umformulieren bricht die Frage ab.
 export const multiqueryRetrieval = (variantCount: number, candidatesPerList: number, rrfK: number): Retrieve =>
   async (_index, queryVector, topK, { question, chatModel, signal }) => {
     const variantSchema = z.object({ variants: z.array(z.string().trim().min(1)).length(variantCount) });

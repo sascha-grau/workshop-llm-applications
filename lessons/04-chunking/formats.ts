@@ -1,18 +1,16 @@
-// Dateiformate von Lektion 04: die Versionsnummer und das zod-Schema des Manifests. Teil 0
-// (`00-prepare-chunks.ts`) schreibt das Manifest, `chunking.ts` liest und prüft es mit `manifestSchema`;
-// Teil 1 bis 4 schreiben die Indexdateien, `shared/index.ts` liest und prüft sie (dort steht auch
-// `INDEX_FORMAT_VERSION`). Eine Datei mit anderer Version oder Form wird mit der Meldung "neu erzeugen"
-// abgelehnt, statt später unbemerkt falsche Ergebnisse zu liefern. Erhöhe die Zahl, wenn sich das
-// Format ändert.
+// Format von `manifest.json` aus Teil 0: Versionsnummer und zod-Schema. Eine Datei mit anderer Version
+// oder Form wird mit „neu erzeugen“ abgelehnt, statt still falsche Ergebnisse zu liefern.
+// Das Indexformat steht in shared/index.ts. Erklärt: lessons/04-chunking/GUIDE.de.md → „Teil 0“
 
 import { z } from 'zod';
 import { SPECIAL_TOKEN_RESERVE } from '../shared/embeddings.ts';
 
-// Format von `manifest.json` (die vorbereiteten Chunks aus Teil 0).
+// Erhöhe die Zahl, wenn sich das Format ändert.
 export const MANIFEST_FORMAT_VERSION = 3;
 
 export const MANIFEST_FILE = 'manifest.json';
 export const COUNTING_METHOD = {
+  tokenizer: 'tokenizer',
   usage: 'embeddings-usage', overflow: 'embeddings-overflow', estimate: 'character-estimate',
 } as const;
 export const manifestSchema = z.object({

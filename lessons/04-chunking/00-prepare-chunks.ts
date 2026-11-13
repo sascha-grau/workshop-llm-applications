@@ -1,65 +1,23 @@
 // Lektion 04 – Chunking, Teil 0: Chunks vorbereiten
 //
-// Lernziel: Du kannst einen Text in Chunks unter dem Token-Limit zerlegen und das Limit prüfen.
-//
-// Das E5-Modell liest höchstens 512 Tokens pro Eingabe (Token = Wortstück). Dieses Programm schneidet
-// die zwölf OWASP-Dokumente an Absätzen, Listenpunkten und Sätzen in Stücke; Überschriften bleiben
-// beim Text, der darauf folgt. Jedes Stück bekommt seine Überschriften-Kette vorangestellt und wird
-// mit dem Präfix "passage: " gegen das Limit geprüft. Jeder Chunk liegt in einer eigenen Datei,
-// dazu entsteht `manifest.json` mit Modell, Limit, Prüfsummen, Token-Zahl und Quell-Position.
-// Zum Verstehen reichen die KERN-Zeilen (markiert mit `// KERN:`): die Schnittschleife, die
-// Budget-Prüfung und die Erkennung von zu langen Eingaben. Der Rest ist Absicherung.
-//
-// Wie die Tokens gezählt werden: LM Studio hat keinen eigenen Tokenizer-Endpunkt. Das Programm
-// schickt deshalb vorab eine bewusst zu lange Eingabe an `/v1/embeddings` und schaut, was der Server
-// tut. Daraus ergibt sich die Zählmethode, die im Manifest als `counting_method` steht:
-//   1. `embeddings-overflow`: Der Server lehnt die zu lange Eingabe ab (eine Fehlerantwort, die eine
-//      Token-Zahl nennt). Das Programm füllt jede Eingabe auf, liest die Zahl aus der Ablehnung und
-//      zieht die Füllung wieder ab. Das ergibt die echte Zahl des Servers. Es braucht pro Zählung
-//      eine Anfrage.
-//   2. `embeddings-usage`: Der Server nimmt die lange Eingabe an und meldet in `usage.prompt_tokens`
-//      eine Zahl über dem Limit. Dann zählt er ungekürzt, und diese Zahl wird verwendet.
-//   3. `character-estimate`: Der Server nimmt die Eingabe an und liefert keine brauchbare Zahl, oder
-//      er lehnt sie ohne Token-Zahl ab. Dann kann er stillschweigend abschneiden (so verhält sich
-//      llama.cpp teils), und eine echte Zählung ist nicht möglich. Das Programm schätzt dann nur aus
-//      der Zeichenzahl, mit einem Zeichen je Token. Das ist absichtlich sehr vorsichtig und
-//      ergibt viele kleine Chunks. Eine garantierte Obergrenze ist es nicht: Der Server kann die
-//      Eingabe trotzdem kürzen. Das Programm meldet das mit einer INFO-Zeile; hat der Server die lange
-//      Kalibrierungsprobe mit einem Fehlerstatus abgelehnt (nicht Überlauf, nicht 401/403/404/429), gibt es
-//      stattdessen eine Warnung und das Programm macht mit der Schätzung weiter.
-// Lehnt der Server später einen Chunk doch ab, wird er mit einem kleineren Budget neu geteilt,
-// statt dass das Programm abbricht.
-//
-// Anzahl der Anfragen für alle zwölf Dokumente (Beispiellauf mit einem Testserver): `embeddings-overflow`
-// 759 Anfragen für 94 Chunks, `embeddings-usage` 755 Anfragen für 94 Chunks, `character-estimate`
-// 352 Anfragen für 351 Chunks. `--verify` kommt je Methode noch einmal dazu (193, 189, 352).
-// Wie lange das dauert, hängt von deiner Hardware ab.
-//
-// Eingabe:  content/owasp-genai-top-10/NN-*.md (zwölf Dateien)
-// Ausgabe:  content/owasp-genai-top-10/chunks/<dokument>--NNN.md (ein Chunk pro Datei) und
-//           chunks/manifest.json. Der Ordner `chunks/` wird nicht eingecheckt (steht in .gitignore),
-//           du erzeugst ihn selbst.
-//
-// Voraussetzungen: LM Studio läuft mit gestartetem Server (Port 1234), und das E5-Modell
-// (REMOTE_EMBEDDING_MODEL_NAME) ist geladen. Burp wird nicht gebraucht. Diesen Teil musst du einmal
-// ausführen, bevor Lektion 04, Teil 1 bis 5 laufen. Lektion 05 bis 08 brauchen nur die Indizes (aus Teil 2, 3
-// oder 4), und die entstehen aus diesen Chunks.
-// Start: npm run l04:0
+// Lernziel: Einen Text in Chunks unter dem Token-Limit von E5 (512) zerlegen und das Limit prüfen.
+// Braucht:  den E5-Tokenizer (`npm run tokenizer:fetch`, einmalig), sonst LM Studio mit E5. Läuft einmal
+//           vor Teil 1–4 (meist durch die Trainerin oder den Trainer).
+// Schreibt: content/owasp-genai-top-10/chunks/ (ein Chunk je Datei + manifest.json) – gelesen von Teil 1–4.
+// Start:    npm run l04:0   ·   prüfen: npm run l04:0 -- --verify   ·   Hilfe: npm run l04:0 -- --help
+// Erklärt:  lessons/04-chunking/GUIDE.de.md → „Teil 0“
 //
 // Aufgabe:
-//   1. Prüfe die erzeugten Chunks mit `npm run l04:0 -- --verify`. Das Programm vergleicht Quelle,
-//      Prüfsummen und Token-Zahlen und gibt `minimum_tokens` und `maximum_tokens` aus (kleinste und größte Token-Zahl).
-//   2. Setze oben `TOKEN_LIMIT_OVERRIDE` auf 256, lösche `content/owasp-genai-top-10/chunks/` und
-//      starte neu: Es entstehen deutlich mehr Chunks. Danach setze `TOKEN_LIMIT_OVERRIDE` zurück auf
-//      `undefined`, lösche `chunks/` und starte `npm run l04:0` erneut. Sonst passen Teil 1 bis 4 nicht
-//      zu den Chunks.
-//   3. Öffne `content/owasp-genai-top-10/chunks/manifest.json` und lies `format_version` (3), `counting_method` und
-//      `counting`: Wie hat dein Server gezählt, und was heißt das für die Verlässlichkeit der Zahlen?
+//   1. Öffne `chunks/01-llm01-prompt-injection--001.md` und `--002.md`: An welcher Grenze hat KERN 3
+//      geschnitten (Absatz, Listenpunkt oder Satz)?
+//   2. Lies `counting_method` in `chunks/manifest.json` und suche es in der Tabelle im Guide: Wurde exakt
+//      gezählt (Tokenizer oder Server) oder nur geschätzt?
+//   3. Benenne `chunks/` in `chunks-512/` um (VS Code: Explorer, F2). `TOKEN_LIMIT_OVERRIDE` auf 256,
+//      `npm run l04:0`: Wie viele Chunks entstehen?
+//      ↺ Danach `undefined`, den neuen Ordner `chunks/` löschen und `chunks-512/` zurück in `chunks/`
+//        umbenennen (sonst lehnen Teil 1–4 die Chunks ab).
 //
-// Aufruf mit Optionen (vom Repo-Root):
-//   npm run l04:0              erzeugt chunks/ (bricht ab, wenn der Ordner schon existiert)
-//   npm run l04:0 -- --verify  prüft vorhandene Chunks gegen Quelle und Token-Limit
-//   npm run l04:0 -- --help    zeigt eine Kurzhilfe
+// Lesen: die Zeilen `// KERN 1–4`. Der Rest ist Absicherung (Kalibrierung, Prüfsummen, Neuversuch).
 
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -72,15 +30,14 @@ import { MANIFEST_FORMAT_VERSION, MANIFEST_FILE, COUNTING_METHOD, manifestSchema
 
 import { log } from '../shared/logging.ts';
 import { runMain } from '../shared/startup.ts';
+import { E5_TOKENIZER, loadE5TokenCounter } from './tokenizer.ts';
 
-// Nur für die Aufgabe 2: Ersetzt für diesen Lauf das Token-Limit von E5 (512), ohne `shared/embeddings.ts`
-// zu ändern. Erlaubt sind ganze Zahlen von 1 bis 512. `undefined` heißt: normales Limit.
+// Standard: undefined (= 512, das Limit von E5). Nur für Aufgabe 3; erlaubt sind ganze Zahlen 1–512.
 const TOKEN_LIMIT_OVERRIDE: number | undefined = undefined;
-// Zeichen je Token in der Notfall-Schätzung. 1 ist absichtlich viel zu vorsichtig: lieber zu kleine Chunks
-// als zu große, die der Server stillschweigend kürzen könnte.
+// Standard: 1 Zeichen je Token, nur im Schätzmodus. Absichtlich viel zu vorsichtig: lieber zu kleine
+// Chunks als zu große, die der Server stillschweigend kürzen könnte.
 const ESTIMATE_CHARACTERS_PER_TOKEN = 1;
-// Die Reserve für das Start- und das End-Token, die E5 (Tokenizer XLM-R) um den Text setzt, steht
-// als `SPECIAL_TOKEN_RESERVE` in `shared/embeddings.ts`; die Zeichenschätzung reserviert beide zusätzlich.
+// Die Schätzung reserviert zusätzlich Start- und End-Token (`SPECIAL_TOKEN_RESERVE` in shared/embeddings.ts).
 const relativeLinkPattern = /\]\((?![a-z][a-z\d+.-]*:|\/|#)([^)]+)\)/gi;
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 const EMBEDDING_REQUEST_FAILED_MESSAGE = 'The embedding request failed. Check REMOTE_MODEL_BASE_URL, start the LM Studio server and load the model configured in REMOTE_EMBEDDING_MODEL_NAME.';
@@ -112,9 +69,8 @@ class OverlongChunk extends Error {
   }
 }
 
-// KERN: Erkennt in einer Fehlerantwort, dass die Eingabe zu lang war, und liest die Token-Zahl heraus.
-// Das hängt vom Server ab, deshalb sucht es mit mehreren Mustern nach Wörtern wie "too large" oder
-// "exceeds" und einer Zahl vor "tokens".
+// KERN 1: Zählen über den Server (Rückfall, wenn der lokale Tokenizer fehlt). Erkennt in einer Fehlerantwort „Eingabe zu lang“ und liest die
+// Token-Zahl heraus. Der Wortlaut hängt vom Server ab, deshalb mehrere Muster ("too large", "exceeds").
 function overflowResult(body: string): Probe | undefined {
   if (!/(?:tokens?|context[-_\s]*(?:size|length|window|limit)|prompt.{0,30}too long|input.{0,30}too (?:large|long))/i.test(body)
       || !/(?:too (?:large|long|many)|exceed|overflow|context[-_\s]*(?:size|length|window|limit)|maximum.{0,20}tokens)/i.test(body)) return;
@@ -124,11 +80,9 @@ function overflowResult(body: string): Probe | undefined {
   return { overflow: true, tokens: match ? Number(match[1]) : undefined };
 }
 
-// Schickt eine Eingabe an den Embedding-Endpunkt und liest daraus die Token-Zahl. Das Programm geht
-// davon aus, dass LM Studio eine Eingabe über 512 Tokens entweder mit der echten Token-Zahl
-// ablehnt oder sie annimmt und ungekürzt in `usage.prompt_tokens` zählt. Nimmt der Server sie an
-// und liefert keine solche Zahl, kann er stillschweigend abschneiden. Dann gilt nur die
-// konservative Zeichenschätzung (siehe Kopf der Datei), und die ist keine garantierte Obergrenze.
+// Eine Anfrage an den Embedding-Endpunkt: abgelehnt (mit Token-Zahl) oder angenommen (mit
+// `usage.prompt_tokens`, falls geliefert). Ohne beides kann der Server still kürzen; dann bleibt nur
+// die Zeichenschätzung. Die drei Zählmethoden: GUIDE.de.md → „Teil 0“.
 async function embeddingProbe(server: ServerContext, input: string, calibration = false): Promise<Probe> {
   let response;
   try {
@@ -190,7 +144,21 @@ async function countTokens(
   return tokens;
 }
 
-async function createCounter(prefix: string, limit: number): Promise<CountingContext> {
+// Zählmethode wählen: Der lokale Tokenizer hat Vorrang, weil er exakt ist und LM Studio selbst nicht
+// verlässlich zählt (`usage` ist 0, zu lange Eingaben werden still gekürzt). Fehlt er (offline, kein Cache),
+// läuft Teil 0 mit den Server-Methoden oder der Schätzung weiter, statt abzubrechen.
+export async function createCounter(prefix: string, limit: number, loadTokenizer = loadE5TokenCounter): Promise<CountingContext> {
+  try {
+    const count = await loadTokenizer();
+    return {
+      prefix, limit, method: COUNTING_METHOD.tokenizer,
+      calibration: { method: COUNTING_METHOD.tokenizer, model: E5_TOKENIZER.model, revision: E5_TOKENIZER.revision },
+      count: async (text) => count(prefix + text.trim()),
+      probe: async (input) => { const tokens = count(input); return { tokens, overflow: tokens > limit }; },
+    };
+  } catch {
+    log('WARN', 'Local E5 tokenizer unavailable. Falling back to server counting or a character estimate. Run npm run tokenizer:fetch with internet access; if the cache is damaged, remove .cache/tokenizers and fetch again. Copy .cache/tokenizers for offline use.');
+  }
   const server: ServerContext = {
     model: remoteEmbeddingModel.name,
     endpoint: `${remoteEmbeddingModel.baseURL.replace(/\/$/, '')}/embeddings`,
@@ -282,8 +250,7 @@ function blocks(source: string) {
 }
 
 async function splitLargeBlock(source: string, start: number, end: number, counter: CountingContext, budget: number): Promise<Range[]> {
-  // KERN: Passt der Abschnitt samt Überschriften-Kette ins Budget, bleibt er ganz. Sonst wird er
-  // geteilt.
+  // KERN 2: Passt der Abschnitt samt Überschriften-Kette ins Budget, bleibt er ganz. Sonst wird er geteilt.
   if (await counter.count(renderChunk(source, [start, end])) <= budget) return [[start, end]];
   const body = source.slice(start, end);
   const protectedSpans = protectedRanges(body);
@@ -294,7 +261,7 @@ async function splitLargeBlock(source: string, start: number, end: number, count
       .map((match) => match.index + match[0].length)
       .filter((position) => safe(position) && body.slice(0, position).trim()
         && !/^\s*(?:#{1,3} [^\n]+\s*)+$/.test(body.slice(0, position)));
-    // KERN: Binäre Suche nach dem spätesten Schnitt, bei dem der Teil noch ins Budget passt. Der Rest
+    // KERN 3: Binäre Suche nach dem spätesten Schnitt, bei dem der Teil noch ins Budget passt. Der Rest
     // wird rekursiv weiter geteilt.
     let low = 0;
     let high = positions.length - 1;
@@ -348,7 +315,7 @@ async function validate({ directory, manifest, sources, counter, verified = new 
       if (text !== renderChunk(source, [chunk.source_start, chunk.source_end]) || sha256(text) !== chunk.sha256) {
         throw new Error(`Chunk content does not match: ${chunk.file}`);
       }
-      // KERN: Budget-Prüfung. Jeder fertige Chunk wird noch einmal gezählt und darf das Limit nicht überschreiten.
+      // KERN 4: Budget-Prüfung. Jeder fertige Chunk wird noch einmal gezählt und darf das Limit nicht überschreiten.
       const tokenCount = await counter.count(text, !verified.has(chunk.sha256));
       if (tokenCount > counter.limit) {
         throw new OverlongChunk(entry.file, chunk.file, [chunk.source_start, chunk.source_end], tokenCount);
@@ -386,12 +353,13 @@ async function listSources(sourceDirectory: string): Promise<Map<string, string>
   return new Map(await Promise.all(names.map(async (name) => [name, await readFile(join(sourceDirectory, name), 'utf8')] as const)));
 }
 
-function matchesManifest(value: unknown, model: string, counter: CountingContext, sources: Map<string, string>): value is Manifest {
+export function matchesManifest(value: unknown, model: string, counter: CountingContext, sources: Map<string, string>): value is Manifest {
   const result = manifestSchema.safeParse(value);
   if (!result.success) return false;
   const manifest = result.data;
   return manifest.model === model && manifest.limit === counter.limit
-    && manifest.passage_prefix === counter.prefix && manifest.counting_method === counter.method
+    && manifest.passage_prefix === counter.prefix
+    && (manifest.counting_method === counter.method || (manifest.counting_method !== COUNTING_METHOD.estimate && counter.method !== COUNTING_METHOD.estimate))
     && manifest.sources.map((entry) => entry.file).join('\n') === [...sources.keys()].join('\n');
 }
 
@@ -400,11 +368,13 @@ async function writeChunks(stage: string, sources: Map<string, string>, counter:
   const manifest = {
     format_version: MANIFEST_FORMAT_VERSION, model, limit: counter.limit, passage_prefix: counter.prefix, special_token_reserve: SPECIAL_TOKEN_RESERVE,
     counting_method: counter.method,
-    counting_request: counter.method === COUNTING_METHOD.estimate ? null : { method: 'POST', request: { model,
+    counting_request: counter.method === COUNTING_METHOD.estimate || counter.method === COUNTING_METHOD.tokenizer ? null : { method: 'POST', request: { model,
       input: counter.method === COUNTING_METHOD.overflow ? '<passage_prefix><trimmed_chunk_text><padding>' : '<passage_prefix><trimmed_chunk_text>' } },
     counting: counter.method === COUNTING_METHOD.estimate
       ? `Conservative estimate: one token per character of prefix and text, plus two special tokens; not a guaranteed token count.`
-      : 'Token count from the embedding endpoint for prefix and text, including special tokens.',
+      : counter.method === COUNTING_METHOD.tokenizer
+        ? 'Local intfloat/multilingual-e5-base tokenizer count for prefix and trimmed text, including special tokens; no truncation.'
+        : 'Token count from the embedding endpoint for prefix and text, including special tokens.',
     source_offsets: 'JavaScript UTF-16 code units; contiguous, nonoverlapping ranges cover every character of the original source.',
     calibration: counter.calibration, sources: [] as SourceRecord[],
   } as const;
@@ -431,7 +401,8 @@ async function main() {
   if (flags.has('--help')) {
     console.log('npm run l04:0              Generate chunks and check them against the token limit.\n'
       + 'npm run l04:0 -- --verify Verify existing chunks and source coverage.\n'
-      + 'Reads REMOTE_MODEL_BASE_URL, REMOTE_MODEL_API_KEY and REMOTE_EMBEDDING_MODEL_NAME.');
+      + 'Uses the local E5 tokenizer (first use downloads ~17 MB). Offline setup: npm run tokenizer:fetch, then copy .cache/tokenizers.\n'
+      + 'Reads REMOTE_EMBEDDING_MODEL_NAME; server fallback also reads REMOTE_MODEL_BASE_URL and REMOTE_MODEL_API_KEY.');
     return;
   }
   const sourceDirectory = join(contentDirectory, 'owasp-genai-top-10');
@@ -473,6 +444,7 @@ async function main() {
         console.log(JSON.stringify(summary));
         return;
       } catch (error) {
+        // Ist ein fertiger Chunk doch zu lang, wird nur er mit kleinerem Budget neu geteilt, statt abzubrechen.
         if (!(error instanceof OverlongChunk)) throw error;
         const rangeKey = JSON.stringify([error.sourceFile, error.source_start, error.source_end]);
         const previous = budgets.get(rangeKey) ?? limit;
@@ -493,4 +465,4 @@ async function main() {
   }
 }
 
-await runMain(main);
+if (import.meta.main) await runMain(main);
