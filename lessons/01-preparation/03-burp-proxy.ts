@@ -1,26 +1,21 @@
 // Lektion 01 – Vorbereitung, Teil 3: Den Datenverkehr in Burp Suite beobachten
 //
 // Lernziel: Du siehst in der HTTP-History von Burp, was dein Programm wirklich an das Modell schickt.
-//
-// Derselbe Chat-Server wie in Teil 2, aber jede ausgehende Anfrage läuft jetzt über Burp.
-// Ein Proxy sitzt zwischen Programm und Server und zeigt jede HTTP-Anfrage an. So erscheinen
-// Prompts und Antworten in der HTTP-History von Burp. Achtung: Die History zeigt auch den Header
-// `Authorization: Bearer …`, also den API-Schlüssel im Klartext. Teile Burp-Screenshots oder
-// Projektdateien nicht, ohne ihn vorher zu schwärzen.
-//
-// Voraussetzungen: LM Studio (Server gestartet) und Open WebUI laufen. Burp ist in diesem Teil der Kern, aber
-//   technisch optional. In `.env.example` ist BURP_PROXY_URL leer, der Proxy ist also freiwillig. Für diesen Teil trägst du
-//   in `.env` BURP_PROXY_URL=http://localhost:8080 ein (der Standard-Listener von Burp). Ist die Adresse gesetzt, muss Burp laufen (Intercept aus).
-//   Ohne BURP_PROXY_URL läuft das Programm ohne Proxy und du siehst nichts in Burp.
-//   Burp Community: https://portswigger.net/burp/communitydownload
-//   CA-Zertifikat (nur HTTPS, ab Lektion 02, Teil 2): https://portswigger.net/burp/documentation/desktop/external-browser-config/certificate (nur exportieren, nicht im Browser installieren; siehe README.de.md im Repo-Root)
-// Start: npm run l01:3   (oder Datei öffnen und F5 drücken)
+// Braucht:  wie Teil 2, dazu Burp (Intercept aus) und `BURP_PROXY_URL=http://localhost:8080` in `.env`.
+// Start:    npm run l01:3   (oder F5; läuft, bis du Strg+C drückst)
+// Erklärt:  lessons/01-preparation/GUIDE.de.md → „Teil 3“
+// Achtung:  Burp zeigt den API-Schlüssel im Klartext (`Authorization: Bearer …`). Vor dem Teilen schwärzen.
 //
 // Aufgabe:
 //   1. Stelle in Open WebUI eine Frage und suche die Anfrage in der HTTP-History von Burp. Wo steht dein Text?
-//   2. Schalte in Burp "Intercept on", ändere deine Frage in der Anfrage und leite sie weiter. Antwortet das Modell auf die geänderte Frage?
-//   3. Streaming ausprobieren: Setze `disableStreaming` auf `false` und ersetze die zwei Zeilen im Handler
-//      durch den auskommentierten Block unter dem Handler. Wie sieht die Antwort in Burp jetzt aus?
+//   2. Schalte in Burp "Intercept on", ändere deine Frage in der festgehaltenen Anfrage und leite sie weiter.
+//      Worauf antwortet das Modell?
+//      ↺ Danach Intercept wieder aus (sonst hält Burp jede weitere Anfrage fest).
+//   3. Setze `disableStreaming` auf `false` und ersetze die zwei Zeilen im Handler durch den Block darunter.
+//      Wie sieht die Antwort in Burp jetzt aus?
+//      ↺ Danach zurücksetzen: `git checkout -- lessons/01-preparation/03-burp-proxy.ts`.
+//
+// Lesen: die Zeilen `// KERN 1–2`. Der Rest ist wie in Teil 2.
 import express from 'express';
 import { ChatOpenAI } from '@langchain/openai';
 import { createOllamaApiFacade } from 'ollama-api-facade-js';
@@ -35,14 +30,13 @@ import { requestAbortSignal, sendChatStream } from '../shared/stream.ts';
 import { runMain } from '../shared/startup.ts';
 
 const ADVERTISED_MODEL = 'lesson-01-part-3';
+// So lange wartet ein Modell-Aufruf, auch während Intercept die Anfrage festhält (Aufgabe 2).
 const MODEL_TIMEOUT_MS = 60_000;
 
 async function main() {
-  // NEU: Ab hier läuft jede ausgehende Anfrage dieses Prozesses über Burp (falls konfiguriert).
-  // Der "Dispatcher" ist das Objekt von undici (Nodes HTTP-Client), das entscheidet, über welche Verbindung eine Anfrage
-  // rausgeht; ein Proxy-Dispatcher schickt sie über Burp. `setGlobalDispatcher` macht ihn zum Standard für alle Anfragen.
-  // Später in Lektion 02, Teil 2 gilt das auch für das Laden von Webseiten.
-  // Ab Lektion 02 erledigt `useBurpIfConfigured()` dasselbe in einer Zeile.
+  // KERN 1: Ab hier läuft jede ausgehende Anfrage dieses Prozesses über Burp, falls BURP_PROXY_URL gesetzt ist.
+  // Der Dispatcher von undici (Nodes HTTP-Client) wählt die Verbindung; ab Lektion 02 erledigt das
+  // `useBurpIfConfigured()` in einer Zeile.
   if (getBurpDispatcher()) setGlobalDispatcher(getBurpDispatcher()!);
 
   const model = new ChatOpenAI({
@@ -51,7 +45,7 @@ async function main() {
     apiKey: remoteModel.apiKey,
     // Wiederholungen würden in Burp als verwirrende Doppelanfragen auftauchen: lieber sofort scheitern.
     maxRetries: 0,
-    // NEU: Eine vollständige Antwort ist in Burp viel leichter zu lesen als viele kleine Stücke.
+    // KERN 2: Eine vollständige Antwort ist in Burp viel leichter zu lesen als viele kleine Stücke.
     disableStreaming: true,
     // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts).
     __includeRawResponse: true,
@@ -66,15 +60,13 @@ async function main() {
   ollamaApi.postApiChat(async (chatRequest, chatModel, chatResponse) => {
     const signal = requestAbortSignal(chatResponse);
     await logInvocation('Model', { messages: chatRequest.messages.length }, async () => {
-      // `invoke` wartet auf die ganze Antwort; `sendChatStream` holt den Text (mit SHOW_THINKING=true auch die
-      // Denkschritte) daraus.
+      // `invoke` wartet auf die ganze Antwort; `sendChatStream` schickt sie in einem Stück an Open WebUI.
       const response = await chatModel.invoke(toPlainMessages(chatRequest.messages), { signal });
       await sendChatStream(chatResponse, response, signal);
     });
   });
 
-  // Zum Ausprobieren (Aufgabe 3) einkommentieren und damit im Handler `invoke` +
-  // `sendChatStream(…, response, …)` ersetzen:
+  // Für Aufgabe 3: Diese zwei Zeilen ersetzen im Handler `invoke` und `sendChatStream(…, response, …)`.
   //   const stream = await chatModel.stream(toPlainMessages(chatRequest.messages), { signal });
   //   await sendChatStream(chatResponse, stream, signal);
 
@@ -84,5 +76,4 @@ async function main() {
   listenWithLogging(app, ADVERTISED_MODEL);
 }
 
-// Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.
 await runMain(main);

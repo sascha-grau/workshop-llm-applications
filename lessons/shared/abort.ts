@@ -1,5 +1,5 @@
-// Wartet auf `promise`, bricht aber mit einem AbortError ab, sobald `signal` auslöst. Das Versprechen
-// selbst läuft weiter, wir hören nur auf zu warten (für APIs, die kein Signal annehmen).
+// Warten abbrechen für APIs ohne AbortSignal. Übersicht: lessons/shared/README.de.md
+// Grenze: `promise` läuft weiter, nur das Warten endet mit einem AbortError (docs/architecture.de.md#bekannte-grenzen).
 export function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const cleanup = () => signal.removeEventListener('abort', onAbort);

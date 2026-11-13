@@ -1,24 +1,20 @@
 // Lektion 01 – Vorbereitung, Teil 1: Hallo, Sprachmodell
 //
 // Lernziel: Du schickst einen Prompt an ein Sprachmodell und liest die Antwort Token für Token mit.
-//
-// Die Datei sendet eine Frage an einen OpenAI-kompatiblen Server und gibt die Antwort aus, sobald
-// sie ankommt. Ein Token ist ein Wortstück (ca. 3–4 Zeichen); das Modell liest und erzeugt Text
-// Token für Token. Streaming heißt: Die Antwort kommt stückweise statt am Ende auf einmal.
-// Kein eigener Server, kein Proxy – nur der Modell-Client.
-//
-// Voraussetzungen: LM Studio läuft mit geladenem Chat-Modell, Server gestartet (https://lmstudio.ai).
-//   Modellname und Adresse stehen in .env (REMOTE_MODEL_*, siehe .env.example); kopiere den Namen aus LM Studio.
-//   Modell: Qwen3.5-4B, https://huggingface.co/Qwen/Qwen3.5-4B. Burp wird nicht benötigt.
-// Start: npm run l01:1   (oder Datei öffnen und F5 drücken)
+// Braucht:  LM Studio mit geladenem Chat-Modell, Server gestartet; `REMOTE_MODEL_*` in `.env`.
+// Start:    npm run l01:1   (oder F5)
+// Erklärt:  lessons/01-preparation/GUIDE.de.md → „Teil 1“
 //
 // Aufgabe:
 //   1. Ändere die Frage in `model.stream(...)` und starte neu.
-//   2. Setze beim ChatOpenAI-Objekt `temperature: 1.5` und frage mehrmals dasselbe. Was ändert sich?
-//      (`temperature` steuert, wie zufällig die Wortwahl ist; 0 = möglichst gleichbleibend.)
-//   3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `modelText(response)` aus (Import:
-//      `import { modelText } from '../shared/text.ts';`; `.text` allein ließe die Denkschritte auch mit
-//      `SHOW_THINKING=true` weg). Wann siehst du die Antwort?
+//      ↺ Danach die ursprüngliche Frage zurück.
+//   2. Setze im ChatOpenAI-Objekt `temperature: 1.5` und starte dreimal. Was ändert sich?
+//      ↺ Danach die Zeile `temperature` wieder entfernen.
+//   3. Ersetze `model.stream` und die Schleife durch `const response = await model.invoke(...)` und gib
+//      `modelText(response)` aus (Import aus `../shared/text.ts`). Wann siehst du die Antwort?
+//      ↺ Danach zurücksetzen: `git checkout -- lessons/01-preparation/01-hello-llm.ts`.
+//
+// Lesen: die Zeilen `// KERN 1–3`. Der Rest ist Handwerk.
 import { ChatOpenAI } from '@langchain/openai';
 import { remoteModel } from '../shared/config.ts';
 import { logInvocation } from '../shared/logging.ts';
@@ -26,22 +22,23 @@ import { withoutThinking } from '../shared/stream.ts';
 import { runMain } from '../shared/startup.ts';
 
 async function main() {
-  // ChatOpenAI spricht die OpenAI-API, die auch die meisten lokalen Modell-Server anbieten.
-  // Mit `baseURL` zeigst du auf einen anderen Server, mehr ist nicht nötig.
+  // KERN 1: ChatOpenAI spricht die OpenAI-API, die auch LM Studio und die meisten lokalen Server anbieten.
+  // `baseURL` aus `.env` zeigt auf deinen Server statt auf OpenAI; mehr ist nicht nötig.
   const model = new ChatOpenAI({
     model: remoteModel.name,
     apiKey: remoteModel.apiKey,
     // Keine automatischen Wiederholungen: Fehler sollen sofort sichtbar werden.
     maxRetries: 0,
-    // Rohantwort behalten: Sie enthält die Denkschritte (siehe shared/text.ts); nur für SHOW_THINKING nötig.
+    // Rohantwort behalten: Nur darin stehen die Denkschritte (siehe shared/text.ts); nötig für SHOW_THINKING.
     __includeRawResponse: true,
     configuration: { baseURL: remoteModel.baseURL },
   });
 
   await logInvocation('Model', { model: remoteModel.name }, async () => {
-    // `stream` liefert Stücke (Chunks), sobald das Modell sie erzeugt, statt auf die ganze Antwort zu warten.
+    // KERN 2: `stream` liefert Stücke, sobald das Modell sie erzeugt, statt auf die ganze Antwort zu warten.
     const stream = await model.stream('Erkläre in zwei Sätzen, was ein Sprachmodell ist.');
-    // `withoutThinking` lässt die Denkschritte weg; mit SHOW_THINKING=true zeigt es sie als `<think>`-Block.
+    // KERN 3: Jedes Stück sofort ausgeben. `withoutThinking` lässt die Denkschritte weg; mit
+    // SHOW_THINKING=true zeigt es sie als `<think>`-Block.
     for await (const chunk of withoutThinking(stream)) {
       process.stdout.write(chunk.text);
     }
@@ -49,5 +46,6 @@ async function main() {
   });
 }
 
-// runMain ist nur der Rahmen: Geht in main() etwas schief, erscheint eine einzelne Fehlerzeile statt eines Stacktraces, und das Programm endet mit Exit-Code 1.
+// runMain ist nur der Rahmen: Ein Fehler in main() wird eine einzelne Fehlerzeile statt eines Stacktraces,
+// und das Programm endet mit Exit-Code 1.
 await runMain(main);

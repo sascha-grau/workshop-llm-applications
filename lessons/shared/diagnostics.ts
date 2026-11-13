@@ -1,17 +1,5 @@
-/**
- * Erreichbarkeits-Checks beim Start. Sie beantworten "Läuft der Modell-Server, und funktioniert
- * der Weg über Burp?", bevor die erste Chat-Anfrage mit einer weniger hilfreichen Fehlermeldung
- * scheitert.
- *
- * Die Checks prüfen nur, ob der Server per HTTP antwortet und den konfigurierten API-Schlüssel
- * akzeptiert. Über Burp prüfen sie zusätzlich, ob `/models` die erwartete JSON-Form liefert. Ob das
- * Modell wirklich Text erzeugen kann, prüfen sie nicht. Schlägt ein Check fehl, wirft er einen Fehler
- * mit einer englischen Meldung, die sagt, was du prüfen sollst. Das Programm bricht dann mit genau
- * dieser Meldung ab.
- */
-// Hinweis zur Reihenfolge: Über Burp ruft `checkService` zuerst die Willkommensseite von Burp (`http://burp/`)
-// ohne API-Schlüssel ab. So geht der Schlüssel nie an einen Dienst, der nur auf Burps Port lauscht (etwa Open WebUI),
-// und ein falscher Dienst auf dem Port wird erkannt, bevor die authentifizierte `/models`-Prüfung läuft.
+// Erreichbarkeit beim Start: Antwortet der Modell-Server und nimmt den API-Schlüssel an, und klappt der Weg über
+// Burp? Ob das Modell Text erzeugt, prüft es nicht. Übersicht: lessons/shared/README.de.md
 import { Agent, fetch as httpFetch } from 'undici';
 import { remoteModel, settings } from './config.ts';
 import { log } from './logging.ts';
@@ -27,16 +15,12 @@ function isModelList(value: unknown): boolean {
 interface CheckOptions {
   /** Den Check über Burp schicken statt direkt zu verbinden. */
   viaBurp?: boolean;
-  /**
-   * Bearer-Token, der mitgeschickt wird. Mit Token oder über Burp muss die Antwort ein 2xx sein.
-   * Gibt es beides nicht, zählt jede HTTP-Antwort als "erreichbar". `checkModelServer` übergibt
-   * immer den konfigurierten Schlüssel, ein abgelehnter Schlüssel (401) zeigt sich also als
-   * fehlgeschlagener Check.
-   */
+  /** Bearer-Token. Mit Token oder über Burp zählt nur eine 2xx-Antwort, sonst jede HTTP-Antwort;
+   *  so fällt ein abgelehnter Schlüssel (401) auf. */
   token?: string;
 }
 
-/** Schickt eine GET-Anfrage über einen eigenen Verbindungspool. Antwortet der Dienst nicht wie erwartet, wirft sie einen Fehler mit englischer Meldung. */
+/** GET-Anfrage; antwortet der Dienst nicht wie erwartet, wirft sie mit einer englischen Meldung, was zu prüfen ist. */
 export async function checkService(label: string, url: string, { viaBurp = false, token }: CheckOptions = {}): Promise<void> {
   // Ein eigener Dispatcher (Verbindungspool) umgeht den globalen Burp-Dispatcher, den ein Programm setzen kann.
   viaBurp = viaBurp && Boolean(getBurpDispatcher());
@@ -47,6 +31,8 @@ export async function checkService(label: string, url: string, { viaBurp = false
     if (viaBurp && !await burpProxyReachable()) {
       throw new Error(`Burp is not running at ${burpAddress} – start Burp or clear BURP_PROXY_URL in .env.`);
     }
+    // Sicherheit: Über Burp zuerst Burps Willkommensseite ohne API-Schlüssel abfragen. So geht der Schlüssel nie an
+    // einen fremden Dienst auf Burps Port (etwa Open WebUI); der fällt auf, bevor `/models` läuft.
     if (viaBurp) {
       let probe;
       try {
@@ -98,13 +84,8 @@ export async function checkService(label: string, url: string, { viaBurp = false
   }
 }
 
-/**
- * Ruft den `/models`-Endpunkt eines Modell-Servers auf (Chat und Embeddings laufen auf demselben Server, eine
- * Prüfung gilt also für beide Modelle), direkt und, bei Programmen mit Burp, zusätzlich über Burp. Beide Prüfungen senden den
- * konfigurierten API-Schlüssel wie die echten Modell-Anfragen. Der Vergleich beider Ergebnisse
- * zeigt, ob der Server ausgefallen ist oder Burp das Problem ist (Listener gestoppt, Intercept an
- * und hält die Anfrage fest). Der Weg über Burp wird zuerst geprüft.
- */
+/** Prüft `/models` über Burp (zuerst) und direkt, beide mit API-Schlüssel. Der Vergleich zeigt, ob der Server
+ *  oder Burp das Problem ist (Listener gestoppt, Intercept an). Ein Server für Chat und Embeddings, eine Prüfung. */
 export async function checkModelServer({ viaBurp }: { viaBurp: boolean }) {
   const modelsURL = `${remoteModel.baseURL.replace(/\/$/, '')}/models`;
 

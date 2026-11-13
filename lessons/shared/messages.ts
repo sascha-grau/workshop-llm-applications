@@ -1,13 +1,8 @@
-/**
- * Hilfsfunktionen für die Nachrichten in den Chat-Handlern.
- */
+// Nachrichten der Fassade für LangChain umwandeln und aufteilen. Übersicht: lessons/shared/README.de.md
 import type { ChatRequest } from 'ollama-api-facade-js';
 
-/**
- * Trennt die System-Prompts ab, die jemand in Open WebUI gesetzt hat, damit ein Programm sie mit
- * seinen eigenen Anweisungen zusammenfügen kann. Die Chat-Vorlagen vieler Modelle erlauben nur
- * eine System-Nachricht ganz am Anfang. Bei zwei lehnt der Server die Anfrage ab (HTTP 500).
- */
+/** Trennt System-Prompts aus Open WebUI ab, damit ein Programm sie mit seinen eigenen zusammenfügt: Viele
+ *  Chat-Vorlagen erlauben nur eine System-Nachricht am Anfang, bei zwei lehnt der Server ab (HTTP 500). */
 export function splitSystemPrompts(messages: ChatRequest['messages']) {
   return {
     systemPrompts: messages.filter((message) => message.getType() === 'system').map((message) => message.text),
@@ -22,14 +17,9 @@ export type PlainMessage = {
   content: string;
 };
 
-/**
- * Die Fassade liefert das Gespräch als Nachrichten-Klassen einer älteren LangChain-Version. Die
- * lehnt `createAgent` ab (`bindTools` akzeptiert sie). Einfache `{ role, content }`-Objekte
- * funktionieren mit jeder Version. Die Rollen heißen dort `system`, `user` und `assistant`.
- * Ein unbekannter Nachrichtentyp wirft einen Fehler. Er würde sonst still zur Rolle `system`, und
- * die hat im Gespräch das meiste Gewicht: Ein Fremdtext bekäme so ungewollt die Rechte einer
- * Anweisung (Sicherheit).
- */
+// UMGEHUNG (ollama-api-facade-js 1.0.7): Die Fassade liefert Nachrichten einer älteren LangChain-Version, die
+// `createAgent` ablehnt; `{ role, content }` geht mit jeder. Sicherheit: Ein unbekannter Typ wirft, statt still
+// `system` zu werden und einem Fremdtext die Rechte einer Anweisung zu geben.
 export function toPlainMessages(messages: ChatRequest['messages']): PlainMessage[] {
   return messages.map((message) => {
     const type = message.getType();
@@ -42,8 +32,10 @@ export function toPlainMessages(messages: ChatRequest['messages']): PlainMessage
   });
 }
 
+// Hilfsanfragen von Open WebUI (Titel, Tags) beginnen mit `### Task:`.
 export const isOpenWebUITask = (question: string): boolean => /^\s*###\s*Task\s*:/i.test(question);
 
+// Kontext vor die letzte Nutzer-Nachricht statt als eigene Nachricht, damit die Rollen abwechselnd bleiben.
 export function withLastUserContext(messages: PlainMessage[], context: string): PlainMessage[] {
   const lastUser = messages.findLastIndex(({ role }) => role === 'user');
   return messages.map((message, index) => index === lastUser

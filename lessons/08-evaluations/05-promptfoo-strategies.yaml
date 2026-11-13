@@ -2,63 +2,24 @@
 #
 # Lektion 08 – Evaluierung, Teil 5: Chunking-Strategien mit promptfoo vergleichen
 #
-# Lernziel: Du misst mit einem Testwerkzeug, welche Chunking-Strategie aus Lektion 04 die besten
-# Antworten liefert, und siehst Trefferquote, MRR, Quellentreue und Korrektheit aus Teil 1 bis 3
-# in einer Tabelle, je Strategie eine Spalte.
+# Lernziel: Du vergleichst die Chunking-Strategien aus Lektion 04 mit vier Kennzahlen in einer Tabelle.
+# Braucht:  LM Studio mit E5- und Chat-Modell, `SHOW_THINKING` leer; alle vier Indizes
+#           (`npm run l04:0`, dann `l04:1` bis `l04:4`).
+# Schreibt: results/lesson-08-promptfoo/05-promptfoo-strategies.html (und ~/.promptfoo/, siehe README).
+# Start:    npm run l08:5 -- --filter-first-n 1   (Probelauf: erste Frage, alle vier Provider)
+#           npm run l08:5   (Demo: voller Lauf, dauert lange; der Trainer lässt ihn vorab laufen)
+# Erklärt:  lessons/08-evaluations/GUIDE.de.md → „Teil 5“ und FAQ.de.md
 #
-# Teil 1 bis 4 messen mit eigenem Code. promptfoo (https://www.promptfoo.dev/) ist ein Werkzeug,
-# das dasselbe für viele Fragen und mehrere Varianten auf einmal macht: Es schickt jede Frage an
-# jeden Provider, prüft jede Antwort mit Regeln (`assert`) und zeigt alles nebeneinander. Schritte:
-#   1. Provider: je Strategie einer, alle mit demselben Assistenten (`promptfoo-assistant.ts`, die
-#      Pipeline aus Lektion 07). Nur der Index wechselt (`config.strategy`).
-#   2. Testfälle: die Fragen aus dem Fragen-Set von Lektion 05 außer F-11 (`promptfoo-testcases.ts`).
-#   3. Prüfungen je Antwort (`defaultTest.assert`): Quellentreffer und MRR ohne Sprachmodell aus den
-#      Metadaten des Providers, Quellentreue (eigene Prüfung `promptfoo-faithfulness.ts`) und
-#      Korrektheit (`llm-rubric`) mit einem Judge.
+# Aufgabe (1 und 2 brauchen den vollen Lauf. Mittelwerte: Tabelle „Messlauf“ im Guide; einzelne Zellen:
+#          Bericht des Trainers, `results/lesson-08-promptfoo/05-promptfoo-strategies.html`):
+#   1. Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Passt
+#      `corpus:headings` zu Teil 1?
+#   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht: Antwort oder Judge?
+#   3. Setze bei `corpus:headings` unter `config` zusätzlich `topK: 3` und starte nur diese Zelle:
+#      `npm run l08:5 -- --filter-first-n 1 --filter-providers headings`. Was ändert sich?
+#      ↺ Danach `topK: 3` wieder entfernen.
 #
-# KERN: Die Prüfungen messen dasselbe wie Teil 1 bis 3. `source-hit` ist die Trefferquote, `mrr`
-# der MRR (der Mittelwert je Spalte), `faithful` die Quellentreue (wie RAGAS: Antwort in Aussagen
-# zerlegen, jede gegen den Kontext prüfen), `correct` die Korrektheit gegen die Kernaussage.
-# Ein ERROR mit "judge format error" in einer Zelle heißt: Der Judge hat das JSON-Format nicht eingehalten.
-# Das ist etwas anderes als ein FAIL (die Antwort enthält nicht gedeckte Aussagen). Fehlt ein Index, zeigt
-# die Zelle ebenfalls [ERROR] mit "Cannot load index"; braucht der Judge länger als das Zeitlimit,
-# meldet sie "did not answer within … s" (erhöhe `timeout` im Judge-Block).
-#
-# Merke: Der Fragen-Index (Lektion 04, Teil 4) deckt mit `FULL_CORPUS = true` (Standard) den ganzen
-# Korpus ab; alle Fragen gehen deshalb an alle vier Provider. Hast du dort `FULL_CORPUS = false` gesetzt,
-# kennt `corpus:questions` nur ein Dokument und schneidet bei den übrigen Fragen schlecht ab.
-# Judge ist das lokale Chat-Modell aus `.env`; ein kleines Modell urteilt unzuverlässig. Kosten: je
-# Frage und Strategie ein Embedding und ein Chat-Aufruf für die Antwort, dazu mehrere Judge-Aufrufe.
-#
-# Voraussetzungen: LM Studio läuft mit E5- und Chat-Modell; die Chunks aus Lektion 04, Teil 0 und
-# die Indizes aus Teil 1 bis 4 existieren (`npm run l04:0`, dann `l04:1` bis `l04:4`). Fehlt ein
-# Index, zeigt promptfoo bei diesem Provider die Fehlermeldung mit dem passenden npm-Skript. Open
-# WebUI und Qdrant braucht dieser Teil nicht. Burp ist optional.
-# Start: npm run l08:5   (lädt `.env` und `promptfoo.env`, fragt ohne Cache, schreibt den Bericht
-#        results/lesson-08-promptfoo/05-promptfoo-strategies.html, den du direkt im Browser öffnest)
-#        npm run l08:5 -- --filter-first-n 3   (nur die ersten drei Fragen: schneller Probelauf)
-#        oder Datei öffnen, unter "Ausführen und Debuggen" die Konfiguration "promptfoo: current config"
-#        wählen und F5 drücken ("Run current file" ist nur für .ts-Dateien; der Bericht heißt gleich)
-#        npx promptfoo view   (Ergebnisse als Web-App mit Mittelwert je Spalte, für die Aufgaben; lauscht
-#        auf allen Netzwerkschnittstellen, also nach dem Ansehen mit Strg+C beenden)
-# Dauer: gemessen rund 35 Sekunden je Zelle (Antwort plus Urteile) mit einem 4B-Modell; der volle Lauf
-# (44 Zellen: 11 Fragen, 4 Provider) dauert also etwa 25 Minuten, auf langsamer Hardware länger.
-# Strg+C hält an; `npm run l08:5 -- --resume` setzt fort. Meldungen "Assertion grading failed …
-# shutting down" nach Strg+C heißen nur: Diese Urteile wurden abgebrochen.
-# Zellen mit ERROR ("judge format error") lassen das Skript mit Exit-Code 100 enden und "Assertion grading
-# failed during eval" samt Stacktrace ausgeben; das ist kein Absturz, Ergebnisse und Bericht werden geschrieben.
-#
-# Aufgabe:
-#   1. Starte die Tests und öffne die Ergebnisse (`npx promptfoo view`, danach mit Strg+C beenden).
-#      Welche Strategie hat die höchste Trefferquote (`source-hit`) und den höchsten MRR? Stimmt die
-#      Spalte `corpus:headings` mit Teil 1 überein? (Erwartung: ungefähr; Teil 1 zählt F-11 mit, hier
-#      fehlt sie, siehe `promptfoo-testcases.ts`. Die Trefferquote liegt in den ersten drei Spalten
-#      bei etwa 0,9 (nur F-05 fehlt), `corpus:questions` findet auch F-05; die Unterschiede im MRR
-#      sind klein, mit elf Fragen gibt es keinen klaren Sieger.)
-#   2. Suche eine Frage, bei der `source-hit` besteht, `correct` aber nicht. Liegt es an der Antwort
-#      oder am Judge? Die Begründung des Judge steht in der Zelle (HTML-Bericht oder `npx promptfoo view`).
-#   3. Ändere `topK` bei einem Provider auf 3 (unter `config`) und starte erneut. Wie ändern sich
-#      Trefferquote und Quellentreue?
+# Lesen: die Kommentare `# KERN 1–6`. Der Rest ist Handwerk.
 
 description: 'Lektion 08, Teil 5: Chunking-Strategien aus Lektion 04 mit promptfoo vergleichen'
 
@@ -66,7 +27,8 @@ description: 'Lektion 08, Teil 5: Chunking-Strategien aus Lektion 04 mit promptf
 prompts:
   - '{{query}}'
 
-# Je Strategie ein Provider: derselbe Assistent, nur ein anderer Index (Lektion 04, Teil 1 bis 4).
+# KERN 1: Je Strategie ein Provider: derselbe Assistent (`promptfoo-assistant.ts`), nur ein anderer
+# Index (Lektion 04, Teil 1 bis 4).
 providers:
   - id: file://promptfoo-assistant.ts
     label: corpus:prepared
@@ -81,7 +43,7 @@ providers:
     label: corpus:questions
     config: { strategy: questions }
 
-# Die Fragen aus dem Fragen-Set von Lektion 05 außer F-11; jede geht an alle Provider.
+# KERN 2: Die Fragen aus dem Fragen-Set von Lektion 05 außer F-11; jede geht an alle Provider.
 tests:
   path: file://promptfoo-testcases.ts
 
@@ -89,43 +51,35 @@ defaultTest:
   # Hängt die Begründung jeder Prüfung an die Zelle, damit der HTML-Bericht sie zeigt (`promptfoo-scores.ts`).
   assertScoringFunction: file://promptfoo-scores.ts
   options:
-    # Der Judge: das Chat-Modell aus `.env` über die OpenAI-kompatible API von LM Studio. Ohne diese
-    # Angabe würde promptfoo OpenAI in der Cloud fragen. Ein stärkeres Modell? Nur die Werte ändern.
-    # Der Block gilt für beide Judge-Prüfungen, `correct` und `faithful`. `promptfoo-judge.ts` verpackt
-    # `openai:chat:<Modell>`; `showThinking` und `reasoning_effort` setzt es selbst (siehe `SHOW_THINKING`
-    # in `.env.example`), sie stehen deshalb nicht hier. Derselbe Block steht in Teil 6; halte beide gleich.
+    # KERN 3: Der Judge für `correct` und `faithful`: das Chat-Modell aus `.env` über LM Studio. Ohne
+    # diesen Block fragte promptfoo OpenAI in der Cloud. Teil 6 hat eine SYNC-Kopie; ändere beide.
     provider:
       id: file://promptfoo-judge.ts
       config:
         model: '{{ env.REMOTE_MODEL_NAME }}'
-        # Fällt auf LM Studio zurück, nie auf OpenAI in der Cloud, falls die Variable fehlt oder leer ist
-        # (`true`: auch ein leerer Wert gilt als fehlend).
+        # Fällt auf LM Studio zurück, nie auf OpenAI, falls die Variable fehlt oder leer ist (`true`).
         apiBaseUrl: '{{ env.REMOTE_MODEL_BASE_URL | default("http://localhost:1234/v1", true) }}'
-        # Nur der NAME der Variable, nicht ihr Wert: promptfoo speichert die Konfiguration jedes Laufs
-        # in seiner Datenbank; ein hier eingesetzter Schlüssel stünde dort im Klartext.
+        # Nur der NAME der Variable: promptfoo speichert die Konfiguration jedes Laufs in seiner
+        # Datenbank; ein hier eingesetzter Schlüssel stünde dort im Klartext.
         apiKeyEnvar: REMOTE_MODEL_API_KEY
         # LM Studio braucht meist keinen Schlüssel; ohne diese Zeile bräche promptfoo ab.
         apiKeyRequired: false
+        # Dieselbe Eingabe soll möglichst dasselbe Urteil ergeben.
         temperature: 0
-        # Zeitlimit je Urteil in Millisekunden, für beide Judge-Prüfungen. Ein denkender Judge braucht bis
-        # etwa 2200 Tokens je Urteil; bei rund 8 Tokens pro Sekunde sind das etwa 275 s plus Einlesen des
-        # Prompts, 10 Minuten lassen Luft (auf sehr langsamer Hardware weiter erhöhen). Danach zeigt die
-        # Zelle ERROR "The judge did not answer within 600 s …".
+        # Zeitlimit je Urteil in ms, für beide Judge-Prüfungen. Größer auf langsamer Hardware; sonst
+        # ERROR "The judge did not answer within … s". Herleitung: GUIDE.de.md → „Teil 5“.
         timeout: 600000
-        # Obergrenze je Urteil, für beide Judge-Prüfungen. Ein Judge braucht keine Denkschritte;
-        # `promptfoo-judge.ts` bittet per `reasoning_effort: none` darum und verbirgt sie, aber ein Server darf
-        # die Bitte ignorieren. Das Limit muss dann Denken und JSON zusammen abdecken: Gemessen brauchte ein
-        # Urteil bis etwa 2200 Tokens, 8192 lässt Luft. Ein abgeschnittenes Urteil ergibt bei `correct` ein
-        # FAIL mit "Could not extract JSON …", bei `faithful` ERROR "judge format error".
+        # Obergrenze in Tokens je Urteil. Muss Denken und JSON abdecken, falls der Server
+        # `reasoning_effort: none` ignoriert. Zu klein: `correct` FAIL "Could not extract JSON",
+        # `faithful` ERROR "judge format error".
         max_tokens: 8192
   assert:
-    # Suche, ohne Sprachmodell: Steht eine erwartete Datei unter den Treffern? Der Mittelwert ist die
-    # Trefferquote (Teil 1). Die Treffer stehen in den Metadaten des Providers, nicht in der Antwort.
+    # KERN 4: Suche ohne Sprachmodell, aus den Metadaten des Providers (nicht aus der Antwort).
+    # Mittelwert von `source-hit` = Trefferquote, von `mrr` = MRR (Teil 1).
     - type: javascript
       metric: source-hit
       value: "context.vars.expectedSources.split(', ').some((source) => context.providerResponse?.metadata?.sources?.includes(source))"
-    # 1 / Rang der ersten erwarteten Datei, 0 außerhalb der Treffer. Der Mittelwert ist der MRR (Teil 1).
-    # Ein Wert 0 zählt bei promptfoo als "nicht bestanden"; maßgeblich ist der Mittelwert der Metrik.
+    # 0 (kein Treffer) zählt als FAIL; maßgeblich ist der Mittelwert der Metrik.
     - type: javascript
       metric: mrr
       value: |
@@ -133,28 +87,23 @@ defaultTest:
         const sources = context.providerResponse?.metadata?.sources ?? [];
         const rank = sources.findIndex((source) => expected.includes(source)) + 1;
         return rank > 0 ? 1 / rank : 0;
-    # Quellentreue (Teil 2), wie RAGAS (ein verbreitetes Evaluierungs-Framework für RAG): eine eigene
-    # Prüfung (`promptfoo-faithfulness.ts`, in zwei Schritten). Erst zerlegt der Judge die Antwort in
-    # Aussagen, dann markiert er jede als gedeckt oder nicht gedeckt, jeweils mit streng geprüftem JSON.
-    # Der Wert ist gedeckt / alle Aussagen; Schwelle 1 heißt: jede Aussage gedeckt. Das ist bewusst
-    # streng, lies deshalb den Mittelwert der Metrik `faithful`, nicht nur bestanden/nicht bestanden.
-    # Hält der Judge das Format auch nach einem zweiten Versuch nicht ein, zeigt die Zelle ERROR
-    # ("judge format error"), kein FAIL. Der Kontext kommt aus den Metadaten des Providers.
+    # KERN 5: Quellentreue (Teil 2) wie RAGAS: Aussagen zerlegen, jede gegen den Kontext prüfen
+    # (`promptfoo-faithfulness.ts`). `threshold` 1 heißt: jede Aussage gedeckt, bewusst streng.
+    # Kleiner = grünere Zellen, nicht bessere Antworten; lies den Mittelwert.
     - type: javascript
       metric: faithful
       value: file://promptfoo-faithfulness.ts
       threshold: 1
-    # Korrektheit (Teil 3): Die Rubrik ist der Prompt des Judge. Dieselbe Rubrik steht in Teil 6;
-    # änderst du sie, ändere beide, sonst sind die Spalten nicht vergleichbar. Der zweite Satz ist Absicht:
-    # Ohne ihn wertet ein Judge "der Kontext enthält dazu nichts" oft als korrekt (siehe `HONEST_NO` in
-    # Teil 3). Die Ausnahme am Ende gilt für F-10: Dort lautet die Kernaussage "OWASP nennt keine Zahlen".
+    # KERN 6: Korrektheit (Teil 3); die Rubrik ist der Prompt des Judge. Der zweite Satz verhindert,
+    # dass "finde nichts" als korrekt gilt (`HONEST_NO` in Teil 3); die Ausnahme gilt F-10.
     - type: llm-rubric
       metric: correct
+      # Teil 6 hat eine SYNC-Kopie dieser Rubrik; ändere beide, sonst sind die Spalten nicht vergleichbar.
       value: >-
         Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
         Eine Antwort, die nur sagt, sie finde dazu nichts oder die Quellen enthielten dazu keine (klare) Angabe,
         ist nicht korrekt – außer die erwartete Kernaussage sagt genau das (z. B. „OWASP nennt keine Zahlen“).
 
-# Ein Testfall nach dem anderen: Ein lokales Modell antwortet nacheinander schneller als parallel.
+# Ein lokales Modell antwortet nacheinander schneller als parallel.
 evaluateOptions:
   maxConcurrency: 1

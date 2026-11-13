@@ -1,13 +1,7 @@
-// Lektion 08 – Evaluierung: der RAG-Assistent als promptfoo-Provider für Teil 5, kein eigener Teil.
-//
-// promptfoo ruft für jeden Testfall einen Provider auf und prüft, was zurückkommt. Dieser Provider
-// ist derselbe Assistent wie in Lektion 07: Index laden (`loadRagIndex`, nur öffentliche Chunks),
-// Frage einbetten, Treffer wählen, Kontext und Prompt bauen (`contextFor`, `promptFor`), antworten.
-// Nur der Index wechselt: `config.strategy` in 05-promptfoo-strategies.yaml wählt ihn. So vergleicht
-// promptfoo die Chunking-Strategien aus Lektion 04 an derselben Pipeline.
-// Anders als die Fassade gibt der Provider neben der Antwort auch Metadaten zurück: die Dateien der
-// Treffer in Rangfolge (`sources`) und den Kontext (`context`). Daraus rechnen die Prüfungen
-// Trefferquote, MRR und Quellentreue, ohne die Antwort nach Dateinamen zu durchsuchen.
+// Lektion 08 – Evaluierung: der RAG-Assistent aus Lektion 07 als promptfoo-Provider für Teil 5,
+// kein eigener Teil. Nur der Index wechselt (`config.strategy` in der YAML-Datei). Anders als die
+// Fassade liefert er Treffer (`sources`) und Kontext (`context`) als Metadaten für die Prüfungen.
+// Erklärt: GUIDE.de.md → „Teil 5“.
 import type { ApiProvider, ProviderOptions, ProviderResponse } from 'promptfoo';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { embeddingQuery } from '../shared/embeddings.ts';
@@ -16,9 +10,9 @@ import { contextFor, embedRagQuestion, loadRagIndex, promptFor, retrieveQuestion
 import { modelText } from '../shared/text.ts';
 import { createChatModel } from './evaluation.ts';
 
-// So viele Chunks bilden den Kontext, wie in Teil 2 und 3. Der MRR zählt Ränge bis hierhin.
+// Standard: 5, wie Teil 2 und 3; in der YAML-Datei je Provider als `topK` änderbar. Der MRR zählt
+// Ränge bis hierhin.
 const DEFAULT_TOP_K = 5;
-// Die gültigen Strategien: die Schlüssel von `indexCommands`, wie in Lektion 06, Teil 1.
 const STRATEGIES = Object.keys(indexCommands) as Strategy[];
 
 // Was in der YAML-Datei unter `config` stehen darf.
@@ -39,7 +33,6 @@ export default class RagAssistantProvider implements ApiProvider {
     this.strategy = strategy;
     this.topK = topK;
     this.providerId = options.id ?? `rag-assistant:${strategy}`;
-    // Burp (Lektion 01, Teil 3), falls gesetzt: Er zeigt dann auch die Anfragen dieses Providers.
     useBurpIfConfigured();
   }
 

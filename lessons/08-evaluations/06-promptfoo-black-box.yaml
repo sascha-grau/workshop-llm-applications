@@ -2,45 +2,21 @@
 #
 # Lektion 08 – Evaluierung, Teil 6: den laufenden Assistenten als Black Box testen
 #
-# Lernziel: Du testest die fertige Anwendung so, wie Open WebUI sie sieht: über ihre API, ohne in
-# den Code zu schauen (Black-Box-Test). Du siehst, was ein solcher Test messen kann und was nicht.
-#
-# Teil 5 ruft die Pipeline direkt auf und bekommt Treffer und Kontext als Metadaten. Hier spricht
-# promptfoo dieselbe Ollama-API wie Open WebUI mit der laufenden Fassade aus Lektion 07; die
-# Anwendung bleibt unverändert. Schritte:
-#   1. Provider: ein Modell der Fassade (`lesson-07-hybrid`, Hybrid-Suche in der Qdrant-Collection
-#      aus Lektion 06, der ganze Korpus). Adresse aus `FACADE_HOST` und `FACADE_PORT` in `.env`.
-#   2. Testfälle: die Fragen aus dem Fragen-Set von Lektion 05 außer F-11 (`promptfoo-testcases.ts`).
-#   3. Prüfungen: Quellentreffer in der Antwort und Korrektheit mit einem Judge.
-#
-# KERN: Ein Black-Box-Test sieht nur die Antwort. Die Fassade hängt die Quellenliste an (Lektion 07),
-# deshalb lässt sich der Quellentreffer im Text prüfen. Den Kontext sieht der Test nicht, also fehlen
-# MRR und Quellentreue; dafür testet er genau das, was Nutzer bekommen, samt Fassade und Prompt.
-#
-# Merke: Der Test braucht die laufende Anwendung, und die Ergebnisse hängen von ihrem Zustand ab
-# (geladene Collection, Modell in LM Studio). Ein anderes Modell der Fassade testen? Nur `id` und
-# `label` ändern, z. B. `ollama:chat:lesson-07-headings`.
-#
-# Voraussetzungen: LM Studio läuft mit E5- und Chat-Modell; Qdrant läuft und die Collection ist
-# geladen (`npm run l06:1`); die Fassade läuft in einem zweiten Terminal (`npm run l07:11` oder
-# `npm run l07:8`). Open WebUI braucht dieser Teil nicht. Burp ist optional.
-# Start: npm run l08:6   (lädt `.env` und `promptfoo.env`, fragt ohne Cache, schreibt den Bericht
-#        results/lesson-08-promptfoo/06-promptfoo-black-box.html, den du direkt im Browser öffnest)
-#        npm run l08:6 -- --filter-first-n 3   (nur die ersten drei Fragen: schneller Probelauf)
-#        oder Datei öffnen, unter "Ausführen und Debuggen" die Konfiguration "promptfoo: current config"
-#        wählen und F5 drücken ("Run current file" ist nur für .ts-Dateien; der Bericht heißt gleich)
-#        npx promptfoo view   (Web-App wie in Teil 5; im geteilten WLAN nach dem Ansehen beenden)
-# Läuft die Fassade nicht, zeigt jede Zeile einen Verbindungsfehler (z. B. "ECONNREFUSED").
+# Lernziel: Du testest die fertige Anwendung nur über ihre API, so wie Open WebUI sie sieht.
+# Braucht:  LM Studio mit E5- und Chat-Modell, `SHOW_THINKING` leer; Qdrant mit Collection
+#           (`npm run l06:1`); die Fassade in einem zweiten Terminal (`npm run l07:11` oder `l07:8`).
+# Schreibt: results/lesson-08-promptfoo/06-promptfoo-black-box.html (und ~/.promptfoo/, siehe README).
+# Start:    npm run l08:6   (Probelauf mit der ersten Frage: npm run l08:6 -- --filter-first-n 1)
+# Erklärt:  lessons/08-evaluations/GUIDE.de.md → „Teil 6“
 #
 # Aufgabe:
-#   1. Starte die Tests und vergleiche Trefferquote und Korrektheit mit `corpus:headings` aus Teil 5.
-#      Beide nutzen dieselben Chunks (Index aus `l04:2`), nur öffentliche Dokumente und fünf Treffer;
-#      anders ist die Suche (hybrid statt nur Vektoren) und der Weg (über die Fassade). Ist die
-#      Hybrid-Suche besser? (Erwartung: ähnlich oder besser; mit elf Fragen ist der Unterschied klein.)
-#   2. Ändere den Provider auf `ollama:chat:lesson-07-score-threshold` und starte erneut (braucht die
-#      Fassade aus `npm run l07:11`; `l07:8` bietet nur `lesson-07-hybrid`). Bei welchen
-#      Fragen lehnt die Anwendung ab, und wie wirkt sich das auf die Korrektheit aus?
+#   1. Vergleiche Trefferquote und Korrektheit mit `corpus:headings` aus Teil 5. Ist Hybrid besser?
+#   2. Setze `id` auf `ollama:chat:lesson-07-score-threshold` und `label` passend (braucht `l07:11`),
+#      starte `npm run l08:6 -- --filter-first-n 1`. Lehnt die Anwendung ab? Was urteilt `correct`?
+#      ↺ Danach zurücksetzen: `id` auf `ollama:chat:lesson-07-hybrid`, `label` auf `lesson-07-hybrid`.
 #   3. Welche Prüfung aus Teil 5 fehlt hier, und warum lässt sie sich über die API nicht rechnen?
+#
+# Lesen: die Kommentare `# KERN 1–4`. Der Rest ist Handwerk.
 
 description: 'Lektion 08, Teil 6: die laufende Fassade aus Lektion 07 als Black Box testen'
 
@@ -48,23 +24,22 @@ description: 'Lektion 08, Teil 6: die laufende Fassade aus Lektion 07 als Black 
 prompts:
   - '{{query}}'
 
-# promptfoo spricht dieselbe Ollama-API wie Open WebUI. Host und Port kommen aus `.env`, dieselben
-# Werte, mit denen die Fassade startet. Steht dort `FACADE_HOST=0.0.0.0` (Open WebUI in Docker),
-# klappt das unter Linux und macOS; unter Windows trage hier `127.0.0.1` ein.
+# KERN 1: Dieselbe Ollama-API wie Open WebUI, Host und Port wie beim Start der Fassade. Mit
+# `FACADE_HOST=0.0.0.0` klappt das unter Linux und macOS; unter Windows hier `127.0.0.1` eintragen.
 providers:
   - id: ollama:chat:lesson-07-hybrid
     label: lesson-07-hybrid
     env:
       OLLAMA_BASE_URL: 'http://{{ env.FACADE_HOST | default("127.0.0.1", true) }}:{{ env.FACADE_PORT | default("11435", true) }}'
 
-# Alle Fragen außer denen zum internen Anhang: Die Collection enthält den ganzen öffentlichen Korpus.
+# KERN 2: Dieselben Testfälle wie Teil 5 (ohne F-11); die Collection enthält den öffentlichen Korpus.
 tests:
   path: file://promptfoo-testcases.ts
 
 defaultTest:
   options:
-    # Der Judge, wie in Teil 5 (dort sind die Zeilen erklärt): das Chat-Modell aus `.env`, über
-    # `promptfoo-judge.ts` (setzt `showThinking` und `reasoning_effort` selbst). Halte beide Blöcke gleich.
+    # SYNC (→ 05-promptfoo-strategies.yaml#defaultTest.options.provider): dort sind die Zeilen
+    # erklärt. Ändere beide, sonst sind die Ergebnisse nicht vergleichbar.
     provider:
       id: file://promptfoo-judge.ts
       config:
@@ -73,30 +48,27 @@ defaultTest:
         apiKeyEnvar: REMOTE_MODEL_API_KEY
         apiKeyRequired: false
         temperature: 0
-        # Zeitlimit je Urteil in Millisekunden (Begründung in Teil 5).
         timeout: 600000
-        # Obergrenze je Urteil; sie muss Denken und JSON abdecken (Begründung in Teil 5).
         max_tokens: 8192
   assert:
-    # Die Fassade hängt die Quellenliste an die Antwort an (Lektion 07); mehr sieht ein Black-Box-Test nicht.
+    # KERN 3: Ein Black-Box-Test sieht nur die Antwort. Gesucht wird nur in der Quellenliste, die die
+    # Fassade anhängt (Lektion 07), nicht im Text: Einen Dateinamen im Text könnte das Modell erfinden.
     - type: javascript
       metric: source-hit
-      # Gesucht wird nur in der angehängten Liste (nach "**Quellen"), nicht im Antworttext: Nennt das
-      # Modell einen Dateinamen nur im Text (oder wurde es dazu gebracht), zählt das nicht als Treffer.
-      # Der Text "\n---\n**Quellen" ist `SOURCE_LIST_PREFIX` aus shared/text.ts; ändere beide zusammen.
+      # SYNC (→ lessons/shared/text.ts#SOURCE_LIST_PREFIX): dessen Ende; ändere beide zusammen.
       value: |
         const sourceList = output.split('\n---\n**Quellen').at(-1) ?? '';
         return output.includes('\n---\n**Quellen')
           && context.vars.expectedSources.split(', ').some((source) => sourceList.includes(source));
-    # Korrektheit wie in Teil 5 (und Teil 3). Die Ausnahme am Ende der Rubrik gilt für F-10
-    # (Kernaussage "OWASP nennt keine Zahlen").
+    # KERN 4: Korrektheit wie in Teil 5 und Teil 3.
     - type: llm-rubric
       metric: correct
+      # SYNC (→ 05-promptfoo-strategies.yaml#defaultTest.assert[metric=correct]): ändere beide zusammen.
       value: >-
         Die Antwort spricht die erwartete Kernaussage sinngemäß und ohne Widerspruch selbst aus: {{keyPoint}}.
         Eine Antwort, die nur sagt, sie finde dazu nichts oder die Quellen enthielten dazu keine (klare) Angabe,
         ist nicht korrekt – außer die erwartete Kernaussage sagt genau das (z. B. „OWASP nennt keine Zahlen“).
 
-# Ein Testfall nach dem anderen: Fassade und lokales Modell beantworten eine Frage nach der anderen.
+# Fassade und lokales Modell beantworten eine Frage nach der anderen.
 evaluateOptions:
   maxConcurrency: 1

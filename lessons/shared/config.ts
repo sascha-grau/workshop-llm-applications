@@ -1,25 +1,10 @@
-/**
- * Einstellungen für alle Lektionen. Sie stammen aus der Datei `.env` im Repo-Root (Vorlage: `.env.example`).
- *
- * Eine Einstellung wird erst geprüft, wenn ein Programm sie zum ersten Mal liest, nicht schon beim
- * Start. Ein Programm meldet sich also nur wegen der Einstellungen, die es wirklich braucht. Fehlt
- * eine Pflicht-Einstellung oder ist sie ungültig, wirft das einen Fehler mit englischer Meldung,
- * den `runMain` (startup.ts) als eine Zeile ausgibt.
- * API-Schlüssel sind optional. Ist keiner gesetzt, steht ein Platzhalter im Code, weil der
- * OpenAI-Client auf einem Wert besteht.
- *
- * Die Startkonfiguration von VS Code (F5) und Code Runner laden `.env` automatisch. Im Terminal
- * startest du ein Programm mit `node --env-file-if-exists=.env <Pfad zur Datei>`, zum
- * Beispiel `lessons/01-preparation/01-hello-llm.ts`, oder einfacher mit `npm run l01:1`.
- */
+// Einstellungen aus `.env` (Vorlage: `.env.example`), geprüft erst beim ersten Lesen: Ein Programm scheitert
+// nur an Einstellungen, die es braucht, mit einer englischen Meldung, die `runMain` als eine Zeile ausgibt.
+// Übersicht: lessons/shared/README.de.md
 
-// Alte Schlüssel aus früheren Versionen der `.env`. Zwei Fälle führen zu einer Fehlermeldung:
-// 1. Ein umbenannter Schlüssel (`replacedSettingsByNewName`): Der alte steht in `.env`, der neue fehlt.
-//    Meldung "has been replaced" mit dem Namen des neuen Schlüssels.
-// 2. Ein früher getrennter Wert, der jetzt für Chat und Embeddings gemeinsam gilt
-//    (`sharedModelSettingsByNewName`): Der alte Schlüssel steht noch in `.env` und weicht vom neuen ab.
-//    Meldung "is no longer used". Gleiche Werte sind kein Fehler. Bei Adressen (`kind: 'url'`) wird vor
-//    dem Vergleich ein Schrägstrich am Ende ignoriert.
+// Alte `.env`-Namen melden sich mit dem neuen Namen: umbenannt ("has been replaced", nur wenn der neue fehlt) oder
+// jetzt gemeinsam für Chat und Embeddings ("is no longer used", nur bei abweichendem Wert; URLs ohne Schrägstrich
+// am Ende verglichen). Invariante: `docs:check` liest die Altnamen aus diesen beiden Tabellen.
 const replacedSettingsByNewName: Record<string, string> = {
   REMOTE_EMBEDDING_MODEL_NAME: 'REMOTE_EMBEDDING_MODEL',
 };
@@ -60,6 +45,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
+// Leer heißt "nicht gesetzt" (undefined): Dann gilt die Konstante im Code, z. B. bei ALL_DOCUMENTS.
 export function optionalBooleanEnv(name: string): boolean | undefined {
   const value = process.env[name]?.trim();
   if (!value) return undefined;
@@ -81,15 +67,16 @@ function validatedURL(name: string, required = true): string | undefined {
   }
 }
 
-/** Der OpenAI-kompatible Server für Chat und Embeddings (Lektion 01 bis 08). */
+/** Der OpenAI-kompatible Server für Chat und Embeddings. */
 export const remoteModel = {
   /** Name des Chat-Modells, genau so, wie der Server ihn kennt. */
   get name() { return requireEnv('REMOTE_MODEL_NAME'); },
+  // Optional: Der OpenAI-Client besteht auf einem Wert, lokale Server brauchen keinen.
   get apiKey() { return configuredEnv('REMOTE_MODEL_API_KEY') || 'not-required'; },
   get baseURL() { return validatedURL('REMOTE_MODEL_BASE_URL')!; },
 };
 
-/** Das Embedding-Modell (Lektion 03 bis 08) auf demselben Server wie das Chat-Modell. */
+/** Die Embedding-Modelle; Adresse und Schlüssel teilen sie mit dem Chat-Modell. */
 export const remoteEmbeddingModel = {
   get name() { return requireEnv('REMOTE_EMBEDDING_MODEL_NAME'); },
   get gemmaName() { return requireEnv('REMOTE_EMBEDDING_GEMMA_MODEL_NAME'); },
@@ -98,22 +85,18 @@ export const remoteEmbeddingModel = {
 };
 
 export const settings = {
-  /** Ob die Denkschritte von Reasoning-Modellen erhalten bleiben (`SHOW_THINKING` in `.env`; Standard: nein). */
+  /** `SHOW_THINKING` in `.env`, Standard: aus. Bedeutung: docs/decisions.de.md#show-thinking */
   get showThinking(): boolean { return optionalBooleanEnv('SHOW_THINKING') ?? false; },
-  /** Adresse des Proxy-Listeners von Burp Suite. Ab Lektion 01, Teil 3 läuft der ausgehende Verkehr darüber, wenn sie gesetzt ist. */
+  /** Burps Proxy-Listener. Ist er gesetzt, leitet `useBurpIfConfigured` den Verkehr darüber. */
   get burpProxyURL(): string | undefined {
     return validatedURL('BURP_PROXY_URL', false);
   },
   get burpCACert(): string | undefined { return process.env.BURP_CA_CERT?.trim() || undefined; },
-  /** Adresse von Qdrant, der Vektordatenbank ab Lektion 06. Ohne Eintrag: die Standardadresse eines lokalen Qdrant. */
   get qdrantURL(): string { return validatedURL('QDRANT_URL', false) ?? 'http://localhost:6333/'; },
   get facadeHost(): string { return process.env.FACADE_HOST?.trim() || '127.0.0.1'; },
 
-  /**
-   * Port der Ollama-Fassade (ab Lektion 01, Teil 2). Es ist nicht Ollamas Standardport 11434, damit die
-   * Programme neben einer echten Ollama-Installation laufen können. Open WebUI braucht diesen Port
-   * in seiner Ollama-Verbindung.
-   */
+  // Nicht Ollamas Standardport, damit die Fassade neben einem echten Ollama laufen kann. Open WebUI
+  // braucht diesen Port in seiner Ollama-Verbindung.
   get facadePort(): number {
     const port = Number(configuredEnv('FACADE_PORT') || '11435');
     if (!Number.isInteger(port) || port < 1 || port > 65535) {

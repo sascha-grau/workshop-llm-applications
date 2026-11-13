@@ -1,52 +1,19 @@
 // Lektion 04 – Chunking, Teil 3: Schneiden, wo das Thema wechselt
 //
-// Lernziel: Du verstehst semantisches Chunking: Das Embedding-Modell findet selbst die Stellen, an
-// denen das Thema springt, und du steuerst das über ein Perzentil.
-//
-// Teil 1 (`01-prepared-chunks.ts`) liest vorbereitete Chunks, Teil 2 (`02-heading-chunking.ts`)
-// schneidet sie an Überschriften. Beide schneiden nach Struktur und sehen nicht, was der Text
-// sagt. Hier fragt das Programm zusätzlich das Embedding-Modell, wo das Thema springt: Es bettet
-// benachbarte Sätze ein, misst ihren Abstand und schneidet an den größten Sprüngen.
-//
-// Eingabe sind die vorbereiteten Chunks aus Teil 0. Jede Datei bleibt eine harte Grenze, und ihre
-// führenden Überschriften (Dokumenttitel, Abschnittsüberschriften) bleiben vor jedem Stück stehen.
-// Auch eine Überschrift im Text ist eine harte Grenze: Sie beginnt ein neues Stück und bleibt beim
-// Text darunter. Zwischen zwei Überschriften wird der Text in Sätze zerlegt. Jeder Satz wird
-// zusammen mit Vorgänger und Nachfolger eingebettet (ein "Fenster"), damit ein kurzer Satz nicht
-// allein entscheidet. Der Abstand zweier Nachbarfenster ist 1 minus ihrer Kosinus-Ähnlichkeit; die
-// größten Abstände eines Dokuments werden zu Schnitten. Fenster und Abstände reichen nie über eine
-// Überschrift hinweg.
-//
-// Perzentil: Ein Wert, unter dem ein bestimmter Anteil aller Werte liegt. Das 95. Perzentil der
-// Abstände ist der Wert, unter dem 95 % aller Abstände liegen; nur die größten 5 % liegen darüber.
-// Geschnitten wird bei Abständen, die größer als diese Schwelle sind. Ehrlich gesagt heißt das:
-// Bei 95 gibt es erst ab etwa 20 Abständen überhaupt einen semantischen Schnitt, und bei weniger
-// als 4 Abständen nie. Kurze Dokumente werden daher nur an Überschriften geschnitten. Eine
-// Größenbegrenzung braucht es dafür nicht: Jedes Stück entstammt einem vorbereiteten Chunk, der
-// schon unter dem Token-Limit liegt (siehe Teil 0); Schnitte machen Chunks nur kleiner.
-//
-// Zum Verstehen reichen die KERN-Zeilen (markiert mit `// KERN:`): Abstände berechnen,
-// Perzentil-Schwelle, Schnitt. Der Rest ist Handwerk (Sätze zerlegen, Überschriften behandeln,
-// Index schreiben).
-//
-// Das Programm zeigt die Abstände und Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true`
-// in chunking.ts oder in `.env` die aller Dokumente; nur die Ausgabe), bettet alle Chunks ein,
-// schreibt Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
-//
-// Das Finden der Schnitte kostet eine eigene Runde Embeddings zusätzlich zu der für die fertigen
-// Chunks, aber noch immer keinen Sprachmodell-Aufruf. Das Programm gibt die Zahl der
-// Embedding-Aufrufe aus, zum Vergleich mit Teil 2.
-//
-// Voraussetzungen: LM Studio läuft mit gestartetem Server und geladenem E5-Modell; die
-// vorbereiteten Chunks existieren (`npm run l04:0`). Burp ist optional.
-// Start: npm run l04:3   (oder Datei öffnen und F5 drücken)
+// Lernziel: Das Embedding-Modell findet Themensprünge; ein Perzentil steuert, wie viele davon
+//           zu Schnitten werden.
+// Braucht:  Chunks aus `npm run l04:0`, LM Studio mit E5.
+// Schreibt: Index `semantic` – gelesen von L06, Teil 1, L07, Teil 2 und L08, Teil 5.
+// Start:    npm run l04:3   (oder F5)
+// Erklärt:  lessons/04-chunking/GUIDE.de.md → „Teil 3“
 //
 // Aufgabe:
-//   1. Ändere `DISTANCE_PERCENTILE` von 95 auf 80. Wie viele semantische Schnitte und Chunks
-//      zeigt die Ausgabe jetzt? (Bei einem kurzen Dokument ändert sich evtl. nichts: siehe oben.)
-//   2. Setze den Wert auf 100. Wie viele semantische Schnitte bleiben, und warum? (Tipp: Geschnitten
-//      wird nur bei Abstand > Schwelle.)
-//   3. Vergleiche die Zahl der Embedding-Aufrufe mit Teil 2 und die Chunk-Anfänge in der Tabelle.
+//   1. `DISTANCE_PERCENTILE` auf 80: Wie viele semantische Schnitte und Chunks zeigt die Ausgabe?
+//   2. `DISTANCE_PERCENTILE` auf 100: Sage vorher, wie viele semantische Schnitte bleiben, dann prüfe es.
+//      ↺ Nach 1 und 2: zurück auf 95, `npm run l04:3` neu starten (sonst rechnen L07/L08 mit deinem Index).
+//   3. Vergleiche „Embedding calls“ mit Teil 2. Woher kommt der Unterschied?
+//
+// Lesen: die Zeilen `// KERN 1–4`. Der Rest ist Handwerk (Sätze, Überschriften, Index).
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
@@ -57,91 +24,65 @@ import { requirePreparedChunks, embedTexts, exampleDocuments, previewText, metad
 import type { Manifest } from './formats.ts';
 import { runMain } from '../shared/startup.ts';
 
-// NEU: Die Schwelle ist dieses Perzentil aller Abstände eines Dokuments: Bei 95 werden höchstens
-// etwa die größten 5 % der Sprünge zu Schnitten (kurze Dokumente bekommen keinen, siehe Kopf der
-// Datei). Es gibt keinen festen Abstand, der "neues Thema" bedeutet; deshalb ist die Schwelle
-// relativ zum Dokument. Die meisten Chunks eines Dokuments entstehen ohnehin an Überschriften,
-// nicht an diesen Schnitten (die Ausgabe zeigt Schnitte gegen Chunks). Kleinerer Wert = mehr
-// Schnitte, größerer = weniger.
+// Standard: 95. Kleiner = mehr Schnitte. Die Schwelle ist relativ zum Dokument, weil kein fester
+// Abstand „neues Thema“ bedeutet.
 const DISTANCE_PERCENTILE = 95;
 
 async function main() {
   requirePreparedChunks();
-  // Burp (Lektion 01, Teil 3) bleibt aktiv, falls gesetzt: Die Anfragen zeigen die Satzfenster und Chunk-Texte
-  // hinaus und die rohen Vektoren zurück.
   useBurpIfConfigured();
-
 
   type SemanticChunk = { chunkFile: string; text: string };
   const manifest = readManifest();
 
-  /**
-   * Schneidet die vorbereiteten Chunks eines Dokuments an den Überschriften darin und dort, wo das
-   * Thema springt. Liefert die neuen Chunks, alle Abstände des Dokuments, die Schwelle, ab der ein
-   * Abstand zum Schnitt wurde, und die Zahl der Embedding-Aufrufe für die Fenster.
-   *
-   * Jedes Stück gehört zu einem vorbereiteten Chunk, der laut Teil 0 in die 512 Tokens passt;
-   * ein Schnitt wegen der Größe ist deshalb nicht nötig. Schnitte machen Chunks nur kleiner, und
-   * Stücke können sehr klein werden.
-   */
+  // Schneidet ein Dokument an Überschriften und Themensprüngen. Keine Größenprüfung nötig: Jedes Stück
+  // stammt aus einem vorbereiteten Chunk unter dem Token-Limit, Schnitte machen es nur kleiner.
   async function splitSemantically(document: Manifest['sources'][number]) {
-    // Die Satzzerlegung und das Trennen der Überschriften (mit ihren Regex-Erklärungen) stehen in
-    // `prepareSemanticChunk` in chunking.ts; hier beginnt der eigentliche Kern dieses Teils.
+    // Sätze und Überschriften trennt `prepareSemanticChunk` in chunking.ts.
     const preparedChunks = document.chunks.map(({ file }) => prepareSemanticChunk(file));
 
     const measuredPreparedChunks: PreparedChunk[] = [];
-    // Anfragen für die Fenster: eine pro vorbereitetem Chunk, der Sätze hat.
     let embeddingCalls = 0;
     for (const preparedChunk of preparedChunks) {
-      // KERN: Ein Fenster ist ein Satz mit Vorgänger und Nachfolger (±1), damit ein kurzer Satz nicht
-      // allein entscheidet. Die Nachbarn kommen aus demselben Abschnitt: Der erste und der letzte
-      // Satz eines Abschnitts haben nur einen Nachbarn, ein einzelner Satz keinen.
+      // KERN 1: Ein Fenster ist ein Satz mit Vorgänger und Nachfolger, damit ein kurzer Satz nicht
+      // allein entscheidet. Fenster reichen nie über eine Überschrift hinweg.
       const windows = preparedChunk.sections.flatMap(({ sentences }) => sentences.map((_sentence, index) =>
         sentences.slice(Math.max(0, index - 1), index + 2).join('')));
-      // Ein Stapel pro vorbereitetem Chunk mit allen Fenstern, nicht ein Aufruf pro Satz. Zwei Fenster
-      // miteinander zu vergleichen ist eine symmetrische Aufgabe, für die die Modellbeschreibung von
-      // E5 "query: " nennt. Das Passage-Präfix bleibt für die fertigen Chunks unten, die Texte, die
-      // durchsucht werden.
-      // Ein vorbereiteter Chunk ohne Sätze hat keine Fenster und braucht keinen Aufruf.
+      // "query: " statt "passage: ": Fenster mit Fenstern zu vergleichen ist eine symmetrische Aufgabe,
+      // für die E5 das Anfrage-Präfix vorsieht. Eine Anfrage je vorbereitetem Chunk mit Sätzen.
       let vectors: number[][] = [];
       if (windows.length > 0) {
         vectors = await embedTexts(windows.map((text) => `${e5Model.queryPrefix}${text}`));
         embeddingCalls += 1;
       }
-      // Die Vektoren kommen in der Reihenfolge der Fenster zurück und werden auf die Abschnitte
-      // verteilt. In einem Abschnitt gehört distances[n] zur Lücke zwischen Satz n und n + 1; es gibt
-      // also einen Abstand weniger als Sätze, und keinen bei einem Abschnitt mit nur einem Satz.
+      // distances[n] gehört zur Lücke zwischen Satz n und n + 1: ein Abstand weniger als Sätze.
       let vectorOffset = 0;
       const sections = preparedChunk.sections.map(({ heading, sentences }): HeadingSection => {
         const sectionVectors = vectors.slice(vectorOffset, vectorOffset + sentences.length);
         vectorOffset += sentences.length;
-        // KERN: Abstand zweier Nachbarfenster = 1 minus Kosinus-Ähnlichkeit.
+        // KERN 2: Abstand zweier Nachbarfenster = 1 minus Kosinus-Ähnlichkeit.
         const distances = sectionVectors.slice(1).map((vector, index) => 1 - cosineSimilarity(sectionVectors[index], vector));
         return { heading, sentences, distances };
       });
       measuredPreparedChunks.push({ ...preparedChunk, sections });
     }
 
-    // Eine Schwelle für das ganze Dokument, nicht eine je vorbereitetem Chunk. Alle Abstände werden
-    // mit demselben Maß beurteilt, und ein Abschnitt ohne Themensprung bekommt keinen Schnitt.
+    // Eine Schwelle für das ganze Dokument: Ein Abschnitt ohne Themensprung bekommt keinen Schnitt.
     const distances = measuredPreparedChunks.flatMap(({ sections }) => sections.flatMap(({ distances }) => distances));
-    // KERN: Schwelle = Perzentil der Abstände. Bei weniger als 4 Abständen ist sie unendlich: kein
+    // KERN 3: Schwelle = Perzentil der Abstände. Bei weniger als 4 Abständen ist sie unendlich: kein
     // semantischer Schnitt.
     const threshold = distances.length < 4 ? Infinity : percentile(distances, DISTANCE_PERCENTILE);
     const chunks: SemanticChunk[] = measuredPreparedChunks.flatMap(({ chunkFile, leadingHeadingBlock, sections }) =>
       sections.flatMap(({ heading, sentences, distances }) => {
-        // Jeder Abschnitt beginnt ein neues Stück, mit seiner Überschrift davor: Dieser Schnitt kommt
-        // aus der Struktur. Innerhalb eines Abschnitts beginnt vor jedem Satz, dessen Abstand zum
-        // vorigen über der Schwelle liegt, ein weiteres Stück: Dieser Schnitt kommt aus dem Thema.
+        // Jeder Abschnitt beginnt ein neues Stück (Schnitt aus der Struktur).
         const pieces = [heading];
         sentences.forEach((sentence, index) => {
-          // KERN: Schnitt, wo der Abstand zum vorigen Satz größer als die Schwelle ist.
+          // KERN 4: Schnitt aus dem Thema, wo der Abstand zum vorigen Satz größer als die Schwelle ist.
           if (index > 0 && distances[index - 1] > threshold) pieces.push('');
           pieces[pieces.length - 1] += sentence;
         });
-        // Nur die führenden Überschriften des vorbereiteten Chunks stehen vor jedem Stück. Eine
-        // Überschrift im Text bleibt vor dem Stück, das sie beginnt. Das trim entfernt den Leerraum,
-        // den ein Stück vom Ende seines letzten Satzes mitnimmt.
+        // Die führenden Überschriften des vorbereiteten Chunks stehen vor jedem Stück, damit es allein
+        // verständlich bleibt.
         return pieces.map((piece) => ({ chunkFile, text: `${leadingHeadingBlock}${piece}`.trim() }));
       }));
 
@@ -154,7 +95,6 @@ async function main() {
     await logInvocation('Embedding', { model: remoteEmbeddingModel.name, documentCount: manifest.sources.length }, async () => {
       const examples = new Set(exampleDocuments(manifest));
       const entries: IndexEntry<ChunkMetadata>[] = [];
-      // Zählt jede Anfrage an den Embedding-Server, zum Vergleich mit Teil 2 am Ende.
       let embeddingCalls = 0;
       for (const document of manifest.sources) {
         const result = await splitSemantically(document);
@@ -167,8 +107,7 @@ async function main() {
             ` · median ${formattedPercentile(50)} · percentile 90 ${formattedPercentile(90)}` +
             ` · percentile ${DISTANCE_PERCENTILE} ${formattedPercentile(DISTANCE_PERCENTILE)} · max ${formattedPercentile(100)}`,
           );
-          // Hier zählen nur die Themensprünge (Abstand > Schwelle) als Schnitte. Die Zahl der Chunks enthält auch die Stücke,
-          // die an einer Überschrift beginnen.
+          // „Cuts“ zählt nur Themensprünge; die Zahl der Chunks enthält auch die Schnitte an Überschriften.
           console.log(
             `Cuts: ${result.distances.filter((distance) => distance > result.threshold).length}` +
             (result.distances.length < 4
@@ -185,9 +124,7 @@ async function main() {
           })));
         }
         if (chunks.length === 0) continue;
-        // Die zweite Runde Embeddings: jetzt die fertigen Chunks. Das Präfix sagt dem Modell, welche
-        // Rolle ein Text spielt (siehe Lektion 03, Teil 3); es ist nur Teil der Eingabe, der Index
-        // speichert den reinen Chunk-Text mit seinen Überschriften.
+        // Zweite Runde Embeddings: die fertigen Chunks, jetzt mit "passage: " wie in Teil 1 und 2.
         const vectors = await embedTexts(chunks.map(({ text }) => `${e5Model.passagePrefix}${text}`));
         embeddingCalls += 1;
         chunks.forEach(({ chunkFile, text }, position) => entries.push({
@@ -200,9 +137,7 @@ async function main() {
 
       const indexFile = writeIndex('semantic', entries);
       printStats(indexFile, entries);
-      // Semantisches Chunking bettet zweimal ein: erst jeden Satz bis zu dreimal in Fenstern, dann die
-      // fertigen Chunks. Deshalb liegt diese Zahl weit über der von Teil 2 (Beispiellauf: 81 gegen
-      // 12), und es ist trotzdem kein Sprachmodell beteiligt.
+      // Zwei Runden Embeddings (Fenster, dann Chunks), deshalb mehr Aufrufe als Teil 2, aber kein Sprachmodell.
       console.log(`Embedding calls: ${embeddingCalls}, LLM calls: 0`);
     });
 
@@ -217,5 +152,4 @@ async function main() {
   }
 }
 
-// Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.
 await runMain(main);

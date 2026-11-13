@@ -1,37 +1,20 @@
 // Lektion 03 – Embeddings, Teil 3: Was die Präfixe bringen
 //
-// Lernziel: Du siehst messbar, wie viel die Rollen-Präfixe `query: ` und `passage: ` ausmachen.
-//
-// Embedding-Modelle wie E5 und EmbeddingGemma wurden mit Präfixen trainiert, die die Rolle eines
-// Texts markieren: eines für Suchanfragen, eines für gespeicherte Dokumente. Das Experiment lässt
-// dieselbe Suche einmal ohne und einmal mit Präfixen laufen.
-//
-// Jeder Fall hat drei Texte: eine Anfrage, eine ähnliche Frage eines anderen Nutzers und die
-// Antwort. Die ähnliche Frage sieht der Anfrage zum Verwechseln ähnlich, beantwortet sie aber
-// nicht. Es werden zwei Indizes durchsucht:
-// - Index A enthält nur die Antworten.
-// - Index B enthält die Antworten plus die ähnlichen Fragen. Hier kann eine ähnliche Frage die
-//   richtige Antwort von Platz 1 verdrängen, ein typisches Problem, wenn FAQ-Einträge oder
-//   Chat-Verläufe im Index landen.
-//
-// Pro Modell und Variante zählt das Programm, wie oft die richtige Antwort auf Platz 1 steht, und
-// zeigt dann für jede Anfrage in Index B Platz und Scores.
-//
-// Modellbeschreibungen: E5 https://huggingface.co/intfloat/multilingual-e5-base,
-// EmbeddingGemma https://huggingface.co/google/embeddinggemma-300m (Name in .env:
-// REMOTE_EMBEDDING_GEMMA_MODEL_NAME; siehe embeddings.ts).
-//
-// Voraussetzungen: LM Studio läuft mit gestartetem Server und beiden Modellen (E5 und
-// EmbeddingGemma). Burp ist optional.
-// Start: npm run l03:3   (oder Datei öffnen und F5 drücken)
+// Lernziel: Du siehst messbar, wie viel die Rollen-Präfixe für Anfrage und Passage ausmachen.
+// Braucht:  wie Teil 2.
+// Start:    npm run l03:3   (oder F5)
+// Erklärt:  lessons/03-embeddings/GUIDE.de.md → „Teil 3“
 //
 // Aufgabe:
-//   1. Lies die erste Tabelle: Bei welchem Modell und in welchem Index bringen die Präfixe am
-//      meisten Treffer auf Platz 1?
-//   2. Füge einen eigenen Fall mit Anfrage, ähnlicher Frage und Antwort zu `cases` hinzu. Verdrängt
-//      deine ähnliche Frage die Antwort?
-//   3. Vertausche in der Variante withPrefix Anfrage- und Passage-Präfix. Wird es schlechter als
-//      ganz ohne Präfix?
+//   1. Lies die erste Tabelle: Bei welchem Modell und in welchem Index bringen die Präfixe am meisten Treffer
+//      auf Platz 1?
+//   2. Füge `cases` einen eigenen Fall hinzu (Anfrage, ähnliche Frage, Antwort). Verdrängt deine ähnliche
+//      Frage die Antwort?
+//      ↺ Danach den Fall wieder entfernen.
+//   3. Vertausche in der Variante `withPrefix` Anfrage- und Passage-Präfix. Wird es schlechter als ohne Präfix?
+//      ↺ Danach zurücktauschen.
+//
+// Lesen: die Zeilen `// KERN 1–3`. Der Rest ist Ausgabe.
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
 import { logError, logInvocation } from '../shared/logging.ts';
@@ -40,14 +23,11 @@ import { assertVectorCount, cosineSimilarity, createEmbeddings } from '../shared
 import { runMain } from '../shared/startup.ts';
 
 async function main() {
-  // Burp (Lektion 01, Teil 3) bleibt aktiv, falls gesetzt: Jede Anfrage dieses Experiments erscheint in der
-  // HTTP-History.
+  // Mit Burp erscheint jede Anfrage dieses Experiments in der HTTP-History.
   useBurpIfConfigured();
 
-  // Beide Modelle kommen aus embeddings.ts: E5 (REMOTE_EMBEDDING_MODEL_NAME) und
-  // EmbeddingGemma (REMOTE_EMBEDDING_GEMMA_MODEL_NAME), vom selben Server unter anderem Namen bereitgestellt. Jedes hat eigene Präfixe:
-  // eines für die Suchanfrage, eines für die gespeicherten Texte.
-  // Die Fälle: query = Suchanfrage, similarQuestion = ähnliche Frage (Ablenker), answer = Antwort.
+  // Je Fall: query = Suchanfrage, similarQuestion = ähnliche Frage eines anderen Nutzers (Ablenker),
+  // answer = die richtige Antwort.
   const cases = [
     {
       query: 'Wie schütze ich mein LLM vor Prompt Injection?',
@@ -120,9 +100,9 @@ async function main() {
   type VariantKey = keyof typeof variantLabels;
   type EntryKind = 'correctAnswer' | 'answer' | 'similarQuestion';
 
-  // Beide Indizes in einem Array: Die Antworten allein sind Index A, mit den ähnlichen Fragen
-  // zusammen Index B. Die eigene Antwort eines Falls wird unten per Identität erkannt
-  // (`entry === answer`); die Antworten der anderen Fälle sind für diese Anfrage falsche Antworten.
+  // KERN 1: Beide Indizes in einem Array: Die Antworten allein sind Index A, mit den ähnlichen Fragen Index B.
+  // Die eigene Antwort eines Falls wird unten per Identität erkannt (`entry === answer`); die Antworten der
+  // anderen Fälle sind für diese Anfrage falsche Antworten.
   const entries = [
     ...cases.map(({ answer }) => answer),
     ...cases.map(({ similarQuestion }) => ({ kind: 'similarQuestion' as const, text: similarQuestion })),
@@ -135,6 +115,7 @@ async function main() {
       await logInvocation('Embedding', { model: model.name, entryCount: entries.length }, async () => {
         const embeddings = createEmbeddings(model.name);
 
+        // KERN 2: Dieselbe Suche zweimal: ohne Präfix und mit den Präfixen des Modells.
         const variants: { key: VariantKey; queryPrefix: string; passagePrefix: string }[] = [
           { key: 'withoutPrefix', queryPrefix: '', passagePrefix: '' },
           { key: 'withPrefix', queryPrefix: model.queryPrefix, passagePrefix: model.passagePrefix },
@@ -148,8 +129,7 @@ async function main() {
         const caseDetails: { [query: string]: { withoutPrefix?: string; withPrefix?: string } } = {};
 
         for (const variant of variants) {
-          // NEU: Das Präfix ist nur Teil der Eingabe ans Modell. Wer es ändert, muss jeden Eintrag
-          // neu einbetten.
+          // Das Präfix ist nur Teil der Eingabe ans Modell. Wer es ändert, muss jeden Eintrag neu einbetten.
           const entryVectors = await embeddings.embedDocuments(
             entries.map(({ text }) => `${variant.passagePrefix}${text}`),
           );
@@ -167,9 +147,10 @@ async function main() {
               }))
               .sort((a, b) => b.similarity - a.similarity);
 
+            // KERN 3: Platz der richtigen Antwort in Index B. Index A ist Index B ohne die ähnlichen Fragen:
+            // Man überspringt sie einfach im Ranking.
             const rank = hits.findIndex(({ kind }) => kind === 'correctAnswer') + 1;
             const bestSimilarQuestion = hits.find(({ kind }) => kind === 'similarQuestion')!;
-            // Index A ist Index B ohne die ähnlichen Fragen: Man überspringt sie einfach im Ranking.
             const bestHitInIndexA = hits.find(({ kind }) => kind !== 'similarQuestion')!;
 
             if (bestHitInIndexA.kind === 'correctAnswer') firstPlaceCounts[variant.key].answers++;
@@ -212,5 +193,4 @@ async function main() {
   }
 }
 
-// Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.
 await runMain(main);

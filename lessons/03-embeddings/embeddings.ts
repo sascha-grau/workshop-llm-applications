@@ -1,13 +1,12 @@
-// Gemeinsam für die Dateien von Lektion 03. E5 und die Kosinus-Ähnlichkeit stehen in
-// shared/embeddings.ts, weil spätere Lektionen sie ebenfalls nutzen. Das zweite Modell wird aus
-// REMOTE_EMBEDDING_GEMMA_MODEL_NAME gelesen: Es muss auf demselben Server laufen wie das erste
-// (gleiche Basis-URL, gleicher API-Key), nur unter anderem Namen.
+// Die zwei Embedding-Modelle von Lektion 03 mit ihren Rollen-Präfixen. E5 steht in shared/embeddings.ts, weil
+// spätere Lektionen es auch nutzen. EmbeddingGemma (REMOTE_EMBEDDING_GEMMA_MODEL_NAME) muss auf demselben Server
+// laufen (gleiche Basis-URL, gleicher API-Key), nur unter anderem Namen.
+// Erklärt: lessons/03-embeddings/GUIDE.de.md → „Teil 2“
 
 import { e5Model } from '../shared/embeddings.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
 
-// Die zwei Embedding-Modelle mit ihren Rollen-Präfixen (siehe 02-comparisons.ts und 03-prefixes.ts): E5 ist das Modell
-// aus REMOTE_EMBEDDING_MODEL_NAME, EmbeddingGemma aus REMOTE_EMBEDDING_GEMMA_MODEL_NAME.
+// Die Präfixe von EmbeddingGemma stammen aus seiner Modellbeschreibung: eines für Suchanfragen, eines für Dokumente.
 export const models = [
   e5Model,
   {

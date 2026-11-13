@@ -1,24 +1,11 @@
-/**
- * Logging für alle Lektionen.
- *
- * Jede Zeile hat die Form `<ISO-Zeitstempel> <LEVEL> <Meldung> { Details }`. So kannst du die
- * Ausgabe eines Programms anhand der Uhrzeit neben die Anfragen in Burps HTTP-History legen.
- *
- * Regel: Protokolliert werden Metadaten (Statuscodes, Dauer, Anzahlen), niemals Prompts oder
- * Antworten. Die einzige Ausnahme ist die Meldung eines Fehlers. Sie erklärt, was schiefging,
- * stammt aber aus einer Bibliothek oder vom Server und kann Teile einer Anfrage zitieren.
- * `redactSecrets` schwärzt darin die konfigurierten API-Schlüssel, andere Geheimnisse erkennt es
- * nicht. Im Workshop teilst du oft Bildschirm und Terminal, schau die Ausgabe also an, bevor du
- * sie weitergibst.
- */
+// Logzeilen `<ISO-Zeitstempel> <LEVEL> <Meldung> { Details }`, per Uhrzeit neben Burps HTTP-History lesbar.
+// Regel: nur Metadaten (Status, Dauer, Anzahlen), nie Prompts oder Modelltext. Ausnahme: Fehlermeldungen von
+// Bibliothek oder Server; darin schwärzt `redactSecrets` nur REMOTE_MODEL_API_KEY. Übersicht: lessons/shared/README.de.md
 import type { NextFunction, Request, Response, Express } from 'express';
 
 type Level = 'INFO' | 'WARN' | 'ERROR';
 
-/**
- * Erkennt einen Abbruch (z. B. Stopp in Open WebUI), der kein echter Fehler ist: ein `AbortError`
- * oder, mit übergebenem `signal`, der Grund, mit dem dieses Signal abgebrochen wurde.
- */
+/** Ein Abbruch (z. B. Stopp in Open WebUI) ist kein Fehler: ein `AbortError` oder, mit `signal`, dessen Grund. */
 export const isAbortError = (error: unknown, signal?: AbortSignal): boolean =>
   (error instanceof Error && error.name === 'AbortError') ||
   (signal?.aborted === true && error === signal.reason);
@@ -62,11 +49,8 @@ function redactSecrets(value: string): string {
   return secret ? value.replaceAll(secret, '[redacted]') : value;
 }
 
-/**
- * Reduziert einen beliebigen Fehler auf seine Meldung und, falls vorhanden, die Meldungen seiner
- * Ursachen (`cause`, höchstens vier Ebenen). Bei Netzwerkfehlern steht dort z. B. ECONNREFUSED. Die
- * konfigurierten API-Schlüssel werden durch "[redacted]" ersetzt.
- */
+/** Meldung eines Fehlers plus die seiner Ursachen (`cause`, AggregateError), etwa ECONNREFUSED bei
+ *  Netzwerkfehlern; der API-Schlüssel wird zu "[redacted]". */
 export function errorDetails(error: unknown) {
   const messages = errorChain(error).map((entry) => {
     const text = entry instanceof Error ? entry.message
@@ -82,13 +66,8 @@ export function errorDetails(error: unknown) {
 // Merkt sich, welche Fehler schon protokolliert wurden, damit derselbe Fehler nicht zweimal erscheint.
 const loggedErrors = new WeakSet<object>();
 
-/**
- * Gibt einen Fehler als eine ERROR-Zeile aus: `<message> – Cause: <kurze Ursache>`. Der Text vor
- * "– Cause:" sagt, was fehlgeschlagen ist, der Text danach, warum. Den Stacktrace zeigt das Log
- * nur mit gesetztem DEBUG. Ein schon protokollierter Fehler wird nicht noch einmal ausgegeben.
- * Ohne `message` dient die Meldung des Fehlers selbst als Text vor der Ursache. Die Funktion gibt
- * nichts zurück: Wer den Fehler weiterwerfen will, wirft das Original danach selbst.
- */
+/** Eine ERROR-Zeile `<message> – Cause: <Ursache>`: vorne, was scheiterte (ohne `message` die Fehlermeldung),
+ *  hinten, warum. Stacktrace nur mit DEBUG. Jeder Fehler erscheint einmal; weiterwerfen muss der Aufrufer. */
 export function logError(error: unknown, message?: string, details: object = {}): void {
   const failure = error !== null && (typeof error === 'object' || typeof error === 'function')
     ? error
@@ -103,11 +82,8 @@ export function logError(error: unknown, message?: string, details: object = {})
   }
 }
 
-/**
- * Protokolliert Start, Ende und Dauer jeder HTTP-Anfrage, die die Fassade erhält. Registriere es
- * vor `createOllamaApiFacade`, sonst antworten zuerst die Routen der Fassade und die Anfrage
- * wird nie protokolliert.
- */
+/** Start, Ende und Dauer jeder Anfrage an die Fassade. Vor `createOllamaApiFacade` registrieren, sonst
+ *  antworten deren Routen zuerst und nichts wird protokolliert. */
 export function logHttpRequests(app: Express) {
   let requestCount = 0;
 
@@ -130,13 +106,8 @@ export function logHttpRequests(app: Express) {
   });
 }
 
-/**
- * Führt `fn` sofort aus und protokolliert Start, Dauer und bei einem Fehler die Zeile
- * "<label>: Call failed – Cause: …", alles unter dem Namen `label` (z. B. "Model",
- * "Embedding", "Hacker News"). `details` steht in jeder Zeile. Fehler werden weitergeworfen (schon
- * protokolliert), damit `logHttpErrors` dem Client noch antworten kann. Ein Abbruch wird nicht hier,
- * sondern nur einmal an anderer Stelle gemeldet.
- */
+/** Führt `fn` aus und protokolliert Start, Dauer und Fehler unter `label`. Fehler werden protokolliert weitergeworfen,
+ *  damit `logHttpErrors` noch antworten kann; einen Abbruch meldet eine andere Stelle, einmal. */
 export async function logInvocation<T>(
   label: string,
   details: object,

@@ -1,16 +1,5 @@
-/**
- * Schickt eine Modell-Antwort als Ollama-Stream an Open WebUI (Streaming: die Antwort kommt
- * stückweise statt auf einmal).
- *
- * Der Stream ist NDJSON: ein JSON-Objekt pro Zeile, jedes mit einem Stück der Antwort, am Ende
- * eine Zeile mit `done: true`. Die Lektionen nutzen diese Funktion statt `asStream` der Fassade. Das
- * verwirft Stücke, die nur aus Leerraum bestehen (z. B. "\n\n"), und würde so die Absätze einer
- * Antwort zusammenschieben. `source` ist ein fertiger Text oder eine fertige Modell-Antwort (beide
- * werden in einem Stück gesendet) oder ein Modell-Stream (wird Stück für Stück gesendet). Mit
- * `options.footer` hängt die Funktion nach der Antwort noch einen festen Text an (die Quellenliste
- * der Lektionen 02 und 07). Denkschritte von Reasoning-Modellen entfernt sie vorher, in beiden Fällen
- * (`withoutThinking`). Mit SHOW_THINKING=true bleiben sie stattdessen als `<think>`-Block stehen.
- */
+// Modell-Antworten als Ollama-Stream (NDJSON: ein JSON-Objekt je Zeile, zuletzt `done: true`) an Open WebUI,
+// ohne Denkschritte (außer mit SHOW_THINKING), optional mit festem `footer`. Übersicht: lessons/shared/README.de.md
 import type { Response } from 'express';
 import type { ChatHandler } from 'ollama-api-facade-js';
 import { EXPECTED_FACADE_VERSION, facadeVersion } from './facade.ts';
@@ -21,15 +10,9 @@ import { settings } from './config.ts';
 const THINK_OPEN = '<think>';
 const THINK_CLOSE = '</think>';
 
-// Entfernt Denkschritte (`<think>…</think>`, siehe `stripThinking` in text.ts) aus einem Modell-Stream,
-// ohne das Streaming aufzugeben. Das Feld `reasoning` der Rohantwort (siehe `modelReasoning`) wird mit
-// SHOW_THINKING=true als `<think>…</think>` in den Stream gesetzt, sonst ignoriert. Die Schwierigkeit: Ein
-// Tag kann über zwei Stücke verteilt ankommen ("<thi" und "nk>"). Deshalb hält die Funktion das Ende
-// eines Stücks zurück, solange es der Anfang eines Tags sein könnte, und gibt es erst mit dem nächsten
-// Stück weiter. Innerhalb eines Blocks wird nichts ausgegeben.
-// Leerraum vor dem ersten sichtbaren Text fällt weg: Modelle schreiben nach `</think>` meist "\n\n".
-// Grenze: Setzt die Chat-Vorlage `<think>` schon in den Prompt, kommt nur `</think>` an. Was davor stand, ist dann
-// bereits gesendet: Ein Stream kann nicht zurücknehmen. `stripThinking` (fertiger Text) erkennt diesen Fall.
+// Entfernt `<think>…</think>` aus einem Modell-Stream, ohne das Streaming aufzugeben. Mit SHOW_THINKING setzt es
+// stattdessen das Feld `reasoning` der Rohantwort (`modelReasoning`) als `<think>…</think>` in den Stream.
+// Grenze: Steht `<think>` schon im Prompt, kommt nur `</think>`; was davor kam, ist gesendet (`stripThinking` erkennt das).
 export async function* withoutThinking(chunks: AsyncIterable<ModelOutput>): AsyncGenerator<{ text: string }> {
   if (settings.showThinking) {
     let thinking = false;
@@ -49,6 +32,9 @@ export async function* withoutThinking(chunks: AsyncIterable<ModelOutput>): Asyn
     if (thinking) yield { text: THINK_CLOSE };
     return;
   }
+  // Ein Tag kann über zwei Stücke verteilt ankommen ("<thi" + "nk>"): Ein Ende, das ein Tag-Anfang sein könnte,
+  // bleibt in `pending`, bis das nächste Stück entscheidet. Leerraum vor dem ersten sichtbaren Text fällt weg,
+  // weil Modelle nach `</think>` meist "\n\n" schreiben.
   let pending = ''; // empfangen, aber noch nicht entschieden
   let thinking = false; // gerade innerhalb von <think>…</think>?
   let started = false; // schon sichtbaren Text ausgegeben?
@@ -90,11 +76,9 @@ function partialTagLength(text: string, tag: string): number {
   return 0;
 }
 
-// Die Fassade gibt keinen öffentlichen Zugriff auf die rohe Express-Antwort, die wir für den Stream
-// brauchen. Deshalb liest `rawResponse` das private Feld `response` (in ChatResponse.d.ts als private
-// deklariert). Das bleibt auf diese eine Hilfsfunktion beschränkt und klappt nur mit der exakt
-// festgelegten Version aus package.json (ollama-api-facade-js 1.0.7). Version und Aufbau werden
-// geprüft: Ändert eine andere Version das Feld, gibt es einen klaren Fehler statt eines stillen Defekts.
+// UMGEHUNG (ollama-api-facade-js 1.0.7): Die rohe Express-Antwort ist nur über das private Feld `response` erreichbar,
+// nur hier gelesen. Version und Form werden geprüft: Ändert sich das Feld, gibt es einen klaren Fehler statt eines
+// stillen Defekts. Siehe docs/decisions.de.md#fassade-gepinnt
 
 function rawResponse(chatResponse: Parameters<ChatHandler>[2]): Response {
   if (facadeVersion !== EXPECTED_FACADE_VERSION || !chatResponse || typeof chatResponse !== 'object') {
@@ -111,10 +95,8 @@ function rawResponse(chatResponse: Parameters<ChatHandler>[2]): Response {
   return response;
 }
 
-/**
- * Liefert ein `AbortSignal`, das auslöst, wenn Open WebUI die Verbindung vorzeitig schließt
- * (z. B. weil du auf "Stopp" klickst). Damit kann ein Programm die Modell-Anfrage abbrechen.
- */
+/** Löst aus, wenn Open WebUI die Verbindung vorzeitig schließt (z. B. "Stopp"). Was kein Signal annimmt, läuft
+ *  trotzdem weiter (`abortable`, docs/architecture.de.md#bekannte-grenzen). */
 export function requestAbortSignal(chatResponse: Parameters<ChatHandler>[2]): AbortSignal {
   const response = rawResponse(chatResponse);
   const controller = new AbortController();
@@ -132,10 +114,9 @@ export function requestAbortSignal(chatResponse: Parameters<ChatHandler>[2]): Ab
   return controller.signal;
 }
 
-// Sendet erst die Antwort, dann den optionalen `footer` (z. B. die Quellenliste) als letztes Stück und zuletzt
-// `done: true`. So hängt der Code Text deterministisch an, ohne dass das Modell ihn kennen muss. Bei Abbruch
-// (`signal`) hören wir sofort auf. Liefert `write` false, ist der Puffer voll: Dann warten wir auf `drain`
-// (Rückstau), statt Speicher mit unausgelieferten Stücken zu füllen.
+// UMGEHUNG (ollama-api-facade-js 1.0.7): eigener Stream statt `asStream`, das Stücke aus reinem Leerraum verwirft und
+// so Absätze zusammenschiebt. Der `footer` kommt vom Code, nicht vom Modell. Bei vollem Puffer wartet `write` auf
+// `drain` (Rückstau), statt Stücke im Speicher zu stapeln.
 export async function sendChatStream(
   chatResponse: Parameters<ChatHandler>[2],
   source: string | ModelOutput | AsyncIterable<ModelOutput>,
@@ -169,9 +150,8 @@ export async function sendChatStream(
       }
     }
   }
-  // Denkschritte erreichen Open WebUI weder im fertigen Text noch im Stream (außer mit SHOW_THINKING=true).
-  // Einzige Lücke im Stream: ein `</think>` ohne öffnendes Tag (siehe `withoutThinking`); der fertige Text
-  // deckt auch diesen Fall ab.
+  // Denkschritte erreichen Open WebUI nicht (außer mit SHOW_THINKING). Einzige Lücke im Stream: `</think>` ohne
+  // öffnendes Tag (siehe `withoutThinking`); ein fertiger Text deckt auch das ab.
   if (typeof source === 'string' || 'text' in source) {
     const answer = typeof source === 'string' ? stripThinking(source) : modelText(source);
     if (answer) await write(answer);

@@ -8,7 +8,7 @@ In this workshop you rebuild an LLM application in eight lessons, each made up o
 
 ## Conventions
 
-Documentation is available in English (README.md) and German (README.de.md). Code comments, including the learning goal and task at the top of each lesson file, are in German; every lesson README has key terms and tasks; the English ones translate the tasks from the German file headers, which stay authoritative; the chat-language notes are English-only. Identifiers, fields, and log and error messages are in English, as usual in code. Prompts to the model and chat replies in Open WebUI are German, because the source material (the German OWASP edition) is German. Error messages in the troubleshooting section are quoted in their original English wording. Where the English docs quote German text (questions to type, prompt sentences, OWASP titles), an English gloss follows in parentheses. You can chat in English, but some system prompts make the model answer in German; the READMEs of Lessons 02, 04, 07 and 08 say where to change that.
+Documentation is available in English (README.md) and German (README.de.md). Code comments, including the learning goal and task at the top of each lesson file, are in German. The tasks live only in the file headers; the lesson READMEs give an overview of the parts, and the guides explain steps and output. The chat-language notes are only in the English lesson documents (`README.md`, `GUIDE.md`). Identifiers, fields, and log and error messages are in English, as usual in code. Prompts to the model and chat replies in Open WebUI are German, because the source material (the German OWASP edition) is German. Error messages in the troubleshooting section are quoted in their original English wording. Where the English docs quote German text (questions to type, prompt sentences, OWASP titles), an English gloss follows in parentheses. You can chat in English, but some system prompts make the model answer in German; the English lesson documents say where to change that.
 
 **TypeScript in five lines:** The files are TypeScript; you read them like JavaScript with a few additions.
 
@@ -17,6 +17,17 @@ Documentation is available in English (README.md) and German (README.de.md). Cod
 - `as const`, `type …` and `import type` change nothing at runtime.
 - `keyof typeof X` means: "one of the keys of X".
 - Node runs the files directly and simply strips the types.
+
+## Documentation
+
+| Document | For whom | Content |
+|---|---|---|
+| `GUIDE.md` per lesson (lesson folder) | Participants | Idea, steps, expected output, pitfalls of each part |
+| [docs/architecture.md](docs/architecture.md) | Everyone | Data flow between the lessons, artefacts, contracts, known limits |
+| [docs/decisions.md](docs/decisions.md) | Everyone | Reasoned decisions |
+| [docs/production.md](docs/production.md) | Everyone | Simplifications versus production, further reading |
+| [docs/trainer.md](docs/trainer.md) | Trainers, contains solutions | Preparation, timings, solutions, pitfalls |
+| [docs/conventions.md](docs/conventions.md) | Authors | Where each piece of information lives, rules for comments and guides |
 
 ## Prerequisites
 
@@ -62,11 +73,11 @@ The original model card of EmbeddingGemma ([google/embeddinggemma-300m](https://
 ### Setting up LM Studio
 
 1. Install LM Studio and download the three models from the table (in the app via search, or with `lms get`). If you only do Lessons 01 and 02, you only need the chat model.
-2. Load the models (chat model, E5 and, for Lesson 03, Parts 2 and 3, EmbeddingGemma) in LM Studio. In the Developer tab you see an identifier for each loaded model.
+2. Load the models (chat model, E5 and, for Lesson 03, Parts 2 and 3, EmbeddingGemma) in LM Studio. In the Developer tab you see an identifier for each loaded model. Load the chat model with **Max Concurrent Predictions = 1** (load settings, advanced view) or with `lms load <identifier> --parallel 1`. The default is 4; the parallel slots share the context, and Lesson 08, Part 5 then reports `Context size has been exceeded`. With 1, a context of 8192 is enough. Doubling the context instead failed on GPU memory in the dress rehearsal.
 3. Start the server in the Developer tab (or with `lms server start`). It listens on port 1234, the address is `http://localhost:1234/v1`.
-4. Enter the identifiers in `.env` (see Setup). Write them exactly as LM Studio shows them (Developer tab or `lms ls`). The values in `.env.example` are only placeholders and may not match your identifiers (see below).
+4. Enter the identifiers in `.env` (see Setup). Write them exactly as LM Studio shows them (Developer tab or `lms ls`). The values in `.env.example` are the usual LM Studio identifiers and may not match yours (see below).
 
-All three model names in `.env.example` are placeholders. Copy the identifier that LM Studio shows for the loaded model: with `lms ps` ([docs](https://lmstudio.ai/docs/cli/local-models/ps)), with `lms ls` ([docs](https://lmstudio.ai/docs/cli/local-models/ls)) or from `GET /v1/models` ([docs](https://lmstudio.ai/docs/developer/openai-compat/models)). By default, LM Studio loads models itself on the first request (JIT loading, see [TTL and Auto-Evict](https://lmstudio.ai/docs/developer/core/ttl-and-auto-evict)). The first response then takes longer, and the model only appears in `lms ps` afterwards.
+The model names in `.env.example` are the identifiers LM Studio showed in the dress rehearsal (`qwen3.5-4b`, `text-embedding-multilingual-e5-base`, `text-embedding-embeddinggemma-300m-qat`). If yours differs, copy the identifier that LM Studio shows for the loaded model: with `lms ps` ([docs](https://lmstudio.ai/docs/cli/local-models/ps)), with `lms ls` ([docs](https://lmstudio.ai/docs/cli/local-models/ls)) or from `GET /v1/models` ([docs](https://lmstudio.ai/docs/developer/openai-compat/models)). By default, LM Studio loads models itself on the first request (JIT loading, see [TTL and Auto-Evict](https://lmstudio.ai/docs/developer/core/ttl-and-auto-evict)). The first response then takes longer, and the model only appears in `lms ps` afterwards.
 
 Another OpenAI-compatible server works too, as long as it offers chat and embeddings at the same address.
 
@@ -125,7 +136,15 @@ cp .env.example .env
 
 `npm ci` installs exactly the versions in `package-lock.json` and checks their integrity. Use `npm install` only when you want to change dependencies.
 
-> **Known dependency advisories (`npm audit`):** `npm audit` still reports 4 findings (`langsmith` up to 0.5.26, `zod` below 4.6.6 (here 3.25) and `uuid` below 11.1.1). They come only through `ollama-api-facade-js` 1.0.7, the latest version and the one the workshop pins, which depends on `@langchain/core` 0.3. No compatible fix exists: fixing it needs major version bumps that break the facade, so `npm audit fix` changes nothing here, and you should never run `npm audit fix --force`. We accept them because the exposure is low: the facade only runs on localhost, LangSmith tracing is off (do not set any `LANGSMITH_*` or `LANGCHAIN_TRACING*` variables, also check your shell profile), and the affected functions are not reachable in the workshop. `package.json` additionally pins fixed versions of `langsmith`, `zod` and `undici` via `overrides` where that is compatible. This is a real example of a trade-off in the supply chain (see [LLM03](content/owasp-genai-top-10/03-llm03-lieferkette.md), in German).
+Then fetch the tokenizer of the E5 model once (about 16 MB, needs internet; afterwards everything runs offline):
+
+```bash
+npm run tokenizer:fetch
+```
+
+It lands in `.cache/tokenizers/`; copy that folder to participants without internet access. Without it, `npm run l04:0` falls back to counting through the model server.
+
+> **`npm audit`** reports known findings through the facade library. Never run `npm audit fix --force`; details: [docs/decisions.md](docs/decisions.md#npm-audit-funde).
 
 On Windows you copy the template like this: `copy .env.example .env` (cmd) or `Copy-Item .env.example .env` (PowerShell). The commands in this README are otherwise written for a POSIX terminal (Linux, macOS, Git Bash). `npm run …` works the same everywhere.
 
@@ -172,7 +191,7 @@ If Open WebUI runs in Docker, the container cannot reach your machine's `127.0.0
 
 ## The lessons
 
-Each lesson has a folder with its own `README.md`: it contains the learning goal, the parts with their files and a recommended order.
+Each lesson has a folder with its own `README.md`: it contains the learning goal, the parts with their files and a recommended order. Each lesson also has a `GUIDE.md` with steps, expected output and help when something goes wrong.
 
 | Lesson | Parts and scripts | Learning goal | Requires |
 | --- | --- | --- | --- |
@@ -189,7 +208,7 @@ Lesson 02 is called "Tool calls" because that is what it builds up to: Parts 1 a
 
 Burp is used from Lesson 01, Part 3, but optional: if `BURP_PROXY_URL` is set, Burp must be running (Intercept off). Lesson 02, Part 2 additionally needs the internet because it fetches a web page, and, if `BURP_PROXY_URL` is set, also `BURP_CA_CERT`, because that page is served over HTTPS.
 
-Lesson 04, Part 0 creates the chunks (roughly 350 to 760 requests to the embedding endpoint, depending on the counting method; the duration depends on your hardware, see the file header). Create them first with `npm run l04:0`. Parts 1 to 4 require them (Part 5 only reads the index from Part 2); Parts 1 to 4 write the indexes to `indexes/` (listed in `.gitignore`, created on the first run). Lesson 05 reads the index from `l04:2` (headings) in all five parts, and so do Parts 1 to 4 of Lesson 08 (Part 5 needs all four indexes, Part 6 the Qdrant collection). Lesson 07 has three basic variants, each reading a different index: `l07:1` the one from `l04:2` (headings), `l07:2` the one from `l04:3` (semantic), `l07:3` the one from `l04:4` (generated questions); Parts 4 to 7 use the index from `l04:2`, Parts 8 to 11 the Qdrant collection from `l06:1`. So start the matching part of Lesson 04 first. Note for `l07:3`: by default (`FULL_CORPUS = true` in `lessons/04-chunking/04-question-generation-chunking.ts`) the question index from `l04:4` covers the whole corpus; the first run takes many minutes. With `FULL_CORPUS = false` it covers only `01-llm01-prompt-injection.md`, so `l07:3` only answers questions about that. All parts of Lesson 07 share the facade's port, so only one runs at a time.
+Lesson 04, Part 0 creates the chunks (number of requests per counting method: [`lessons/04-chunking/GUIDE.md`](lessons/04-chunking/GUIDE.md#part-0--preparing-chunks), deep dive; the duration depends on your hardware). Create them first with `npm run l04:0`. Parts 1 to 4 require them (Part 5 only reads the index from Part 2); Parts 1 to 4 write the indexes to `indexes/` (listed in `.gitignore`, created on the first run). Lesson 05 reads the index from `l04:2` (headings) in all five parts, and so do Parts 1 to 4 of Lesson 08 (Part 5 needs all four indexes, Part 6 the Qdrant collection). Lesson 07 has three basic variants, each reading a different index: `l07:1` the one from `l04:2` (headings), `l07:2` the one from `l04:3` (semantic), `l07:3` the one from `l04:4` (generated questions); Parts 4 to 7 use the index from `l04:2`, Parts 8 to 11 the Qdrant collection from `l06:1`. So start the matching part of Lesson 04 first. Note for `l07:3`: by default (`FULL_CORPUS = true` in `lessons/04-chunking/04-question-generation-chunking.ts`) the question index from `l04:4` covers the whole corpus; the first run takes many minutes. With `FULL_CORPUS = false` it covers only `01-llm01-prompt-injection.md`, so `l07:3` only answers questions about that. All parts of Lesson 07 share the facade's port, so only one runs at a time.
 
 ## Troubleshooting
 
@@ -229,6 +248,7 @@ Here the model call failed because no connection could be made: nobody is listen
 | Open WebUI does not show the model | Is the program running (log `Facade ready`)? Is the address in the Ollama connection correct? For Docker see `host.docker.internal` above. If the log shows `Rejected request with unexpected Host header`, see the row below. |
 | `Rejected request with unexpected Host header. Use localhost, an IP address, host.docker.internal or the FACADE_HOST name in the Open WebUI connection.` (HTTP 403) | The Ollama connection in Open WebUI contains a hostname (e.g. `my-laptop.local`). The facade rejects foreign hostnames as protection against DNS rebinding. Enter `localhost`, an IP address or `host.docker.internal` (Podman: `host.containers.internal`), or set the name as `FACADE_HOST`. |
 | Response breaks off in Open WebUI | The model was too slow, or you pressed Stop. A cancellation shows as `Request cancelled.` in the log. If the model was too slow: try again or use a smaller model (see Hardware). |
+| `Context size has been exceeded` (mainly Lesson 08, Part 5) | LM Studio loads the chat model with 4 parallel slots by default, and they share the context. Reload it with Max Concurrent Predictions 1 (`lms load <identifier> --parallel 1`, see Setting up LM Studio). |
 
 ## Repository layout
 

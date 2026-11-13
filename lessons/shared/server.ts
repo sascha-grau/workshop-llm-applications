@@ -1,22 +1,13 @@
-/**
- * Hilfsfunktionen für die Programme, die die Ollama-Fassade betreiben: Fehlerbehandlung für die
- * Chat-Routen und der Serverstart auf FACADE_PORT. Außerdem weist die Fassade Anfragen mit fremdem
- * Host-Header mit 403 ab (Schutz vor DNS-Rebinding).
- */
+// Die Ollama-Fassade betreiben: vorbereiten (Host-Prüfung, JSON-Parser), Fehler beantworten, starten.
+// Übersicht: lessons/shared/README.de.md
 import type { Express, NextFunction, Request, Response } from 'express';
 import { isIP } from 'node:net';
 import { settings } from './config.ts';
 import { EXPECTED_FACADE_VERSION, facadeRequire, facadeVersion } from './facade.ts';
 import { isAbortError, log, logError } from './logging.ts';
 
-/**
- * Richtet den JSON-Parser ein, den die Fassade braucht. Vor `createOllamaApiFacade` aufrufen.
- * Die Fassade bringt ihr eigenes Express (Version 4) mit. Wir nutzen deshalb dessen öffentlichen
- * JSON-Parser, damit Anfrage und Fassade zusammenpassen. Vorher prüft die Funktion, dass die Fassade
- * wirklich Version 1.0.7 ist und ihr Express die Hauptversion 4 hat; sonst bricht sie mit einer
- * klaren Meldung ab. Außerdem lehnt sie Anfragen mit fremdem Host-Header mit 403 ab (Schutz vor
- * DNS-Rebinding).
- */
+// UMGEHUNG (ollama-api-facade-js 1.0.7): Die Fassade bringt ihr eigenes Express 4 mit; nur dessen JSON-Parser passt
+// zu ihr. Prüft Version und Express-Hauptversion, sonst klarer Abbruch. Vor `createOllamaApiFacade` aufrufen.
 export function prepareFacade(app: Express) {
   const expressPackage: { name?: unknown; version?: unknown } = facadeRequire('express/package.json');
   const facadeExpress: Pick<typeof import('express'), 'json'> = facadeRequire('express');
@@ -26,10 +17,9 @@ export function prepareFacade(app: Express) {
     throw new Error(`Expected ollama-api-facade-js ${EXPECTED_FACADE_VERSION} to resolve Express 4 with json().`);
   }
   const allowedHosts = new Set(['localhost', 'host.docker.internal', 'host.containers.internal', settings.facadeHost.toLowerCase()]);
-  // Schutz vor DNS-Rebinding: Eine fremde Webseite könnte sonst über ihren eigenen Domainnamen, der auf
-  // 127.0.0.1 zeigt, die Fassade in deinem Browser erreichen. Wir lassen deshalb nur localhost, IP-Adressen,
-  // host.docker.internal (Docker), host.containers.internal (Podman) und den Namen aus FACADE_HOST
-  // als Host-Header zu.
+  // Sicherheit (DNS-Rebinding): Eine fremde Webseite könnte über ihren Domainnamen, der auf 127.0.0.1 zeigt, die
+  // Fassade aus deinem Browser erreichen. Erlaubt sind daher nur localhost, IP-Adressen, host.docker.internal
+  // (Docker), host.containers.internal (Podman) und der Name aus FACADE_HOST.
   app.use((request: Request, response: Response, next: NextFunction) => {
     const hostname = request.hostname?.toLowerCase() ?? '';
     const address = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
@@ -43,13 +33,8 @@ export function prepareFacade(app: Express) {
   app.use(facadeExpress.json({ limit: '10mb' }));
 }
 
-/**
- * Macht aus einem Fehler im Chat-Handler eine protokollierte Antwort. Registriere es nach
- * `postApiChat`: Express schickt Fehler nur an Handler, die nach der fehlerhaften Route kommen.
- * Ein Abbruch durch dich (Stopp in Open WebUI) ist kein Fehler und wird nur als INFO protokolliert.
- * Echte Fehler werden auch dann protokolliert, wenn Open WebUI die Verbindung schon geschlossen hat.
- * Die Zeile enthält die kurze Ursache; den Stacktrace gibt es nur, wenn die Umgebungsvariable DEBUG gesetzt ist.
- */
+/** Nach `postApiChat` registrieren: Express reicht Fehler nur an spätere Handler. Ein Abbruch (Stopp in Open WebUI)
+ *  ist nur INFO; echte Fehler werden auch nach geschlossener Verbindung protokolliert. */
 export function logHttpErrors(app: Express) {
   app.use((error: unknown, _request: Request, response: Response, next: NextFunction) => {
     if (isAbortError(error)) {
@@ -72,10 +57,8 @@ export function logHttpErrors(app: Express) {
   });
 }
 
-/**
- * Startet die Fassade auf FACADE_HOST und FACADE_PORT aus `.env` und protokolliert die Adresse, die
- * Open WebUI braucht. `onListening` läuft, sobald der Port belegt ist, z. B. für einen Selbsttest.
- */
+/** Startet auf FACADE_HOST und FACADE_PORT und protokolliert die Adresse für Open WebUI. `onListening` läuft,
+ *  sobald der Port gebunden ist, z. B. für einen Selbsttest. */
 export function listenWithLogging(
   app: Express,
   advertisedModel: string,

@@ -1,10 +1,10 @@
-// Alle Pfade im Projekt werden vom Repo-Root aus aufgelöst, nicht vom aktuellen Arbeitsverzeichnis.
-// Deshalb funktionieren die Programme egal, aus welchem Ordner du sie startest.
+// Pfade vom Repo-Root aus statt vom Arbeitsverzeichnis, damit Programme aus jedem Ordner laufen.
+// Nur `.env` lädt Node relativ zum Arbeitsverzeichnis. Übersicht: lessons/shared/README.de.md
 import { resolve } from 'node:path';
 
-// Repo-Root: zwei Ordner über dieser Datei (lessons/shared/ -> Root).
+// Invariante: Diese Datei liegt zwei Ordner unter dem Repo-Root.
 export const repoRoot = resolve(import.meta.dirname, '../..');
 export const rootPath = (...segments: string[]): string => resolve(repoRoot, ...segments);
 export const contentDirectory = rootPath('content');
-// Hier schreibt Lektion 04 ihre Indizes hin (steht in .gitignore).
+// Erzeugte Indizes; nicht im Repo (.gitignore).
 export const indexesDirectory = rootPath('indexes');

@@ -1,21 +1,7 @@
-// Lektion 08 – Evaluierung: die Prüfung `faithful` (Quellentreue) für Teil 5 als eigene promptfoo-Prüfung,
-// kein eigener Teil.
-//
-// Statt der eingebauten Prüfung `context-faithfulness` von promptfoo gibt es diese eigene, damit Format
-// und Fehler klar sind. Sie nutzt denselben Judge wie `correct`: den Judge-Block der YAML-Datei
-// (`defaultTest.options.provider`, siehe `promptfoo-judge.ts`), nicht das Modell aus `.env` direkt. Ein
-// anderes Modell dort gilt also für beide Prüfungen. Zwei Schritte:
-// 1. Aussagen: Der Judge zerlegt die Antwort in kurze, eigenständige Aussagen (`{"statements": [...]}`).
-//    Enthält die Antwort keine Tatsachenaussagen, ist der Wert 1 ("keine Aussagen"), kein ERROR.
-// 2. Urteile: Der Judge markiert jede Aussage als durch den Kontext gedeckt oder nicht
-//    (`{"verdicts": [{statement, supported, reason}]}`; Anzahl und Nummern werden geprüft).
-// Der Wert ist der Anteil der gedeckten Aussagen; bestanden ist er ab der Schwelle (Standard 1, aus der
-// YAML-Datei). Beide Antworten prüft ein zod-Schema streng. Ist eine leer, abgeschnitten oder fehlerhaft,
-// gibt es je Schritt einen zweiten Versuch; danach endet die Zelle mit ERROR ("judge format error"). Das
-// ist etwas anderes als ein FAIL: Dort sind Aussagen wirklich nicht gedeckt. Die Begründung nennt jede
-// Aussage mit ihrem Urteil, die Zelle im HTML-Bericht zeigt sie. Die Antwort und der Kontext sind fremder
-// Text und stehen deshalb in Tags (`wrapUntrusted`). Zum Verstehen der Lektion nicht nötig.
-
+// Lektion 08 – Evaluierung: die Prüfung `faithful` (Quellentreue) für Teil 5, kein eigener Teil.
+// Wie RAGAS in zwei Schritten: Der Judge zerlegt die Antwort in Aussagen, dann prüft er jede gegen
+// den Kontext. Wert = gedeckte / alle Aussagen. Eigene Prüfung statt `context-faithfulness`, damit
+// Format und Fehler klar sind (docs/decisions.de.md#eigene-faithful-pruefung). Erklärt: GUIDE.de.md → „Teil 5“.
 import type { ChatOpenAI } from '@langchain/openai';
 import type { AssertionValueFunctionContext, GradingResult } from 'promptfoo';
 import { loadApiProvider } from 'promptfoo';
@@ -44,6 +30,8 @@ const SUPPORT_PROMPT =
   '{"verdicts":[{"statement":1,"supported":true,"reason":"Kurze Begründung"}]}. ' +
   'Gib für jede vorgegebene ID genau einen Eintrag zurück, keine zusätzlichen Felder und keinen weiteren Text.';
 
+// Ein Formatfehler bekommt einen zweiten Versuch mit Rückmeldung; danach ERROR "judge format error",
+// nicht FAIL: Über die Antwort sagt ein kaputtes JSON nichts.
 async function askWithRetry<T>(
   model: Pick<ChatOpenAI, 'invoke'>, stage: string, prompt: string, content: string, schema: z.ZodType<T>,
   timeout?: number,
@@ -75,6 +63,7 @@ export async function evaluateFaithfulness(
   const { statements } = await askWithRetry(
     model, 'statement extraction', EXTRACT_PROMPT, wrapUntrusted('answer_under_test', answer), statementsSchema, timeout,
   );
+  // Keine Tatsachenaussage = nichts Ungedecktes: Wert 1 statt ERROR.
   if (statements.length === 0) {
     return {
       pass: true, score: 1,
@@ -82,6 +71,8 @@ export async function evaluateFaithfulness(
       metadata: { statements, verdicts: [] },
     };
   }
+  // Genau ein Urteil je Aussage, jede Nummer einmal: Sonst könnte der Judge Aussagen auslassen
+  // oder doppelt werten, und der Anteil wäre falsch.
   const verdictsSchema = z.strictObject({
     verdicts: z.array(z.strictObject({
       statement: z.number().int().min(1).max(statements.length),
@@ -119,6 +110,8 @@ export default async function faithfulness(output: string, context: AssertionVal
   const retrieved = context.providerResponse?.metadata?.context;
   if (typeof retrieved !== 'string') throw new Error('Faithfulness requires providerResponse.metadata.context.');
   const threshold = context.test.assert?.find((assertion) => assertion.metric === 'faithful')?.threshold ?? 1;
+  // Derselbe Judge-Block wie `correct`: promptfoo reicht ihn je nach Ablauf schon geladen oder als
+  // Definition durch; nur `promptfoo-judge.ts` wird akzeptiert, damit Zeitlimit und Denken stimmen.
   const definition = context.test.options?.provider;
   let judge;
   if (definition instanceof JudgeProvider) {

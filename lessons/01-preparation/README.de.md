@@ -1,45 +1,33 @@
 # Lektion 01 – Vorbereitung
 
-[English](README.md)
+[English](README.md) · Erklärungen, erwartete Ausgabe und Stolperfallen: [GUIDE.de.md](GUIDE.de.md)
 
-**Lernziel:** Du rufst ein Sprachmodell aus TypeScript auf, bindest es in eine Chat-Oberfläche (Open WebUI) ein und siehst in Burp, was dabei wirklich über die Leitung geht. Danach steht die Umgebung für alle weiteren Lektionen.
+**Lernziel:** Du rufst ein Sprachmodell aus TypeScript auf, bindest dein Programm als Modell in eine Chat-Oberfläche (Open WebUI) ein und siehst in Burp, was dabei wirklich über die Leitung geht. Danach steht die Umgebung für alle weiteren Lektionen.
 
-| Teil | Datei | npm-Skript | Lernziel | Braucht |
-| --- | --- | --- | --- | --- |
-| 1 | `01-hello-llm.ts` | `npm run l01:1` | Prompt senden, Antwort Token für Token streamen | LM Studio |
-| 2 | `02-open-webui.ts` | `npm run l01:2` | Programm als Modell `lesson-01-part-2` in Open WebUI anbieten (Fassade) | LM Studio, Open WebUI |
-| 3 | `03-burp-proxy.ts` | `npm run l01:3` | Anfragen und Antworten in der HTTP-History von Burp lesen (Modell `lesson-01-part-3`) | LM Studio, Open WebUI, Burp |
+## Teile
 
-**Reihenfolge:** Starte mit Teil 1 und arbeite die Teile der Reihe nach durch; jeder baut auf dem vorigen auf. `BURP_PROXY_URL` ist in `.env.example` leer, Burp ist also optional. Für Teil 3 trägst du in `.env` `BURP_PROXY_URL=http://localhost:8080` ein (der Standard-Listener von Burp). Ist die Adresse gesetzt, muss Burp laufen (Intercept aus); ohne Burp lässt du sie leer.
+| Teil | Datei | Start | Zeigt | Braucht |
+|---|---|---|---|---|
+| 1 | [`01-hello-llm.ts`](01-hello-llm.ts) | `npm run l01:1` | Prompt senden, Antwort Token für Token streamen | LM Studio mit Chat-Modell |
+| 2 | [`02-open-webui.ts`](02-open-webui.ts) | `npm run l01:2` | Das Programm als Modell `lesson-01-part-2` in Open WebUI (Fassade) | wie Teil 1, dazu Open WebUI |
+| 3 | [`03-burp-proxy.ts`](03-burp-proxy.ts) | `npm run l01:3` | Anfragen und Antworten in der HTTP-History von Burp (Modell `lesson-01-part-3`) | wie Teil 2, dazu Burp |
 
-Einrichtung (Node, LM Studio, `.env`, Open WebUI, Burp): siehe das [Haupt-README](../../README.de.md). Infrastruktur: [`lessons/shared/README.de.md`](../shared/README.de.md).
+Die Aufgaben stehen im Kopf jeder Datei.
 
-## Grundbegriffe
+## Reihenfolge und Abhängigkeiten
 
-- **Token:** ein Wortstück (ca. 3-4 Zeichen); das Modell liest und erzeugt Text Token für Token.
-- **Streaming:** Die Antwort kommt stückweise statt am Ende auf einmal.
-- **`temperature`:** steuert, wie zufällig die Wortwahl ist; 0 heißt so wiederholbar wie möglich.
-- **Ollama-API-Fassade:** ein kleiner Server (Port `FACADE_PORT`), der sich wie Ollama verhält und jede Chat-Nachricht an dein Programm weiterreicht, sodass das Programm in Open WebUI als Modell erscheint.
-- **Proxy (Burp):** sitzt zwischen Programm und Server und zeigt jede HTTP-Anfrage; die HTTP-History zeigt auch den Header `Authorization: Bearer ...`, also den API-Schlüssel im Klartext. Schwärze ihn, bevor du Screenshots oder Projektdateien teilst.
+- **Teil 1 → 3** der Reihe nach; jeder baut auf dem vorigen auf.
+- **Teil 2 und 3** laufen, bis du sie mit Strg+C beendest. Beide belegen den Port der Fassade (`FACADE_PORT`), es läuft immer nur einer.
+- **Burp** ist optional. Für Teil 3 trägst du `BURP_PROXY_URL` in `.env` ein; ist die Adresse gesetzt, muss Burp laufen (Intercept aus). Ohne Burp lässt du sie leer.
+- **Einrichtung** (Node, LM Studio, `.env`, Open WebUI, Burp) steht in der [Wurzel-README](../../README.de.md#einrichtung), die Verbindung von Open WebUI zur Fassade unter [Open WebUI mit der Fassade verbinden](../../README.de.md#open-webui-mit-der-fassade-verbinden-ab-lektion-01-teil-2).
 
-## Aufgaben
+## Weiterlesen
 
-Die Aufgaben stehen auch am Anfang jeder Datei; maßgeblich sind die Dateiköpfe.
+- [GUIDE.de.md](GUIDE.de.md): Begriffe (Token, Streaming, Reasoning-Modell, Fassade, Proxy), Ablauf je Teil, echte Ausgabe, Stolperfallen
+- [lessons/shared/README.de.md](../shared/README.de.md): die gemeinsamen Module (Fassade, Burp, Logging)
+- [docs/architecture.de.md](../../docs/architecture.de.md): Datenfluss über alle Lektionen
+- [docs/decisions.de.md](../../docs/decisions.de.md) und [docs/production.de.md](../../docs/production.de.md): Begründungen und Vereinfachungen
+- [docs/trainer.de.md](../../docs/trainer.de.md) (für Trainer, enthält Lösungen): Vorbereitung, Zeiten
+- Fehlermeldungen: [Wenn etwas nicht klappt](../../README.de.md#wenn-etwas-nicht-klappt) in der Wurzel-README
 
-### Teil 1 – `01-hello-llm.ts`
-
-1. Ändere die Frage in `model.stream(...)` und starte neu.
-2. Setze beim ChatOpenAI-Objekt `temperature: 1.5` und frage mehrmals dasselbe. Was ändert sich? (`temperature` steuert, wie zufällig die Wortwahl ist; 0 = möglichst gleichbleibend.)
-3. Ersetze `model.stream` durch `await model.invoke(...)` und gib `modelText(response)` aus (Import: `import { modelText } from '../shared/text.ts';`; `.text` allein ließe die Denkschritte auch mit `SHOW_THINKING=true` weg). Wann siehst du die Antwort?
-
-### Teil 2 – `02-open-webui.ts`
-
-1. Starte das Programm, wähle "lesson-01-part-2" in Open WebUI und stelle eine Frage.
-2. Ändere `ADVERTISED_MODEL` und lade Open WebUI neu. Wie heißt das Modell jetzt?
-3. Füge in `postApiChat` ein `console.log(chatRequest.messages)` ein. Was schickt Open WebUI alles mit? (Open WebUI schickt zusätzlich eigene Hilfsanfragen für Titel und Tags; sie beginnen mit `### Task:`.)
-
-### Teil 3 – `03-burp-proxy.ts`
-
-1. Stelle in Open WebUI eine Frage und suche die Anfrage in der HTTP-History von Burp. Wo steht dein Text?
-2. Schalte in Burp "Intercept on", ändere deine Frage in der Anfrage und leite sie weiter. Antwortet das Modell auf die geänderte Frage?
-3. Streaming ausprobieren: Setze `disableStreaming` auf `false` und ersetze die zwei Zeilen im Handler durch den auskommentierten Block unter dem Handler. Wie sieht die Antwort in Burp jetzt aus?
+Zurück zur [Übersicht](../../README.de.md).

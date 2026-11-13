@@ -1,23 +1,7 @@
 // Lektion 08 – Evaluierung: der Judge für Teil 5 und 6 als promptfoo-Provider, kein eigener Teil.
-//
-// Der Provider verpackt `openai:chat:<Modell>` (das Modell steht in `config.model` der YAML-Datei) und dient
-// in Teil 5 beiden Judge-Prüfungen, `correct` und `faithful`, in Teil 6 der Prüfung `correct`. Für
-// `faithful` baut er außerdem das LangChain-Modell aus denselben Einstellungen des YAML-Blocks (Modell,
-// Adresse, Schlüssel-Variable, `max_tokens`, `temperature`). Das `timeout` des Blocks gilt für beide
-// Prüfungen. Er setzt zwei Dinge selbst, abhängig von `SHOW_THINKING` aus `.env` (siehe
-// `settings.showThinking`):
-// - `showThinking`: promptfoo setzt `{{ env.X }}` als TEXT ein, und sein OpenAI-Adapter liest
-//   `config.showThinking ?? true`. Der Text "false" wäre also wahr. Hier steht ein echter Boolean. Bleibt das
-//   Denken sichtbar, stellt promptfoo es als "Thinking: …" vor jede Ausgabe von `llm-rubric` (`correct`) und
-//   verfälscht so das Urteil.
-// - `reasoning_effort: 'none'`, nur wenn das Denken verborgen ist: Ein Judge braucht es nicht. Das steht hier
-//   und nicht in der YAML-Datei; ein `passthrough.reasoning_effort` dort hat Vorrang. Ein Server darf den Wert
-//   ignorieren (manche tun das): Entscheidend ist das Verbergen, und `max_tokens` (8192 in der
-//   YAML-Datei) muss dann auch das Denken abdecken, siehe README.
-// Mit SHOW_THINKING=true bleibt beides aus: Der Judge zeigt sein Denken, die Auswertung wird unzuverlässig.
-// Fehlen Modell, Adresse oder der Name der Schlüssel-Variable, bricht der Provider mit einer Meldung ab.
-// Zum Verstehen der Lektion nicht nötig.
-
+// Eine Hülle um `openai:chat:<Modell>`, die `showThinking`, `reasoning_effort` und ein Zeitlimit je
+// Urteil richtig setzt, und die `faithful` dasselbe Modell als LangChain-Modell gibt.
+// Warum es die Hülle gibt: docs/decisions.de.md#judge-huelle und GUIDE.de.md → „Teil 5“.
 import { loadApiProvider, loadApiProviders } from 'promptfoo';
 import type { ApiProvider, ProviderOptions, ProviderResponse } from 'promptfoo';
 import { settings } from '../shared/config.ts';
@@ -42,6 +26,7 @@ export default class JudgeProvider implements ApiProvider {
     if (typeof config.apiKeyEnvar !== 'string' || !config.apiKeyEnvar.trim()) {
       throw new Error('The judge provider setting apiKeyEnvar is missing. Set it to REMOTE_MODEL_API_KEY in the YAML configuration.');
     }
+    // Standard: 600_000 ms, falls die YAML-Datei nichts setzt. Größer = geduldiger mit langsamen Judges.
     this.timeout = config.timeout ?? 600_000;
     if (!Number.isInteger(this.timeout) || this.timeout <= 0 || this.timeout > 2_147_483_647) {
       throw new Error('The judge setting timeout in the YAML must be a positive integer in milliseconds, no greater than 2147483647.');
@@ -55,10 +40,15 @@ export default class JudgeProvider implements ApiProvider {
 
   private buildConfig() {
     const config = { ...this.options.config };
+    // Das Modell steckt in der Provider-ID; das Zeitlimit setzt die Hülle selbst (siehe unten).
     delete config.model;
     delete config.timeout;
+    // Echter Boolean: promptfoo setzt `{{ env.X }}` als Text ein, und der Text "false" wäre wahr.
+    // Sichtbares Denken stünde als "Thinking: …" vor der Ausgabe und verfälschte `llm-rubric`.
     config.showThinking = settings.showThinking;
     config.passthrough = { ...config.passthrough };
+    // Ein `passthrough.reasoning_effort` aus der YAML-Datei hat Vorrang. Der Server darf die Bitte
+    // ignorieren; dann muss `max_tokens` Denken und JSON abdecken.
     if (!config.showThinking && config.passthrough.reasoning_effort === undefined) {
       config.passthrough.reasoning_effort = 'none';
     }
@@ -75,12 +65,18 @@ export default class JudgeProvider implements ApiProvider {
 
   private async loadProvider(): Promise<ApiProvider> {
     const config = this.buildConfig();
+    // promptfoo liest REQUEST_TIMEOUT_MS erst beim Aufruf aus der Umgebung. `loadApiProviders` mit einer
+    // Funktion führt jeden Aufruf in `env` aus: So gilt das Zeitlimit nur für den Judge, nicht für
+    // den Assistenten oder andere Provider desselben Laufs.
     const env = { ...this.options.env, REQUEST_TIMEOUT_MS: String(this.timeout) };
     const provider = await loadApiProvider(this.id(), { options: { config }, env });
     const [scopedProvider] = await loadApiProviders(provider.callApi.bind(provider), { env });
     return scopedProvider;
   }
 
+  // promptfoos OpenAI-Adapter wirft nicht, sondern liefert Text in `response.error`, etwa
+  // "API call error: Error: Request timed out after … ms". Nur genau dieser Wortlaut (verankert)
+  // wird zur klaren Meldung; jeder andere Fehler bleibt unverändert, auch wenn er "timed out" enthält.
   throwIfTimedOut(error: unknown): void {
     const name = error instanceof Error ? error.name : '';
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
@@ -90,6 +86,8 @@ export default class JudgeProvider implements ApiProvider {
     }
   }
 
+  // Für `faithful` (promptfoo-faithfulness.ts): dasselbe Modell mit denselben Einstellungen, aber als
+  // LangChain-Modell, weil diese Prüfung zwei eigene JSON-Aufrufe macht.
   createJudgeModel(): ReturnType<typeof createChatModel> {
     if (!this.chatModel) {
       const config = this.buildConfig();
@@ -112,6 +110,8 @@ export default class JudgeProvider implements ApiProvider {
 
   async callApi(...args: Parameters<ApiProvider['callApi']>): Promise<ProviderResponse> {
     const provider = await this.getProvider();
+    // Eigene Frist für den ganzen Aufruf, zusätzlich zu REQUEST_TIMEOUT_MS, falls der Adapter das Limit
+    // nicht überall anwendet. Bricht promptfoo selbst ab (Strg+C, `callerSignal`), ist das kein Timeout.
     const deadline = AbortSignal.timeout(this.timeout);
     const callerSignal = args[2]?.abortSignal;
     const abortSignal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;

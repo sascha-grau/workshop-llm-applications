@@ -1,16 +1,7 @@
-// Gemeinsame Hilfsfunktionen für Lektion 04 (erstmals in 01-prepared-chunks.ts benutzt): alles, was
-// in allen Teilen identisch sein muss, damit sich ihre Ergebnisse vergleichen lassen. Das
-// Schneiden steht in den Teilen selbst. Die Index-Funktionen (Dateien lesen und schreiben, Ranking)
-// liegen in `shared/index.ts`, weil auch Lektion 05 bis 08 sie brauchen; die Teile importieren sie von dort
-// direkt. Hier liegen:
-// - Konfiguration: `DEMO_QUESTION`, Pfade, Korpus-Konstanten, Beispieldokumente (`EXAMPLE_DOCUMENT`, `ALL_DOCUMENTS`)
-// - Manifest und Chunks lesen: readManifest, readChunk(s), splitByHeadings, sourcesFor, exampleDocuments, percentile
-// - Metadaten: metadataFor (inkl. Zugriffsgruppe `accessGroup`: "public" oder "internal")
-// - Dateiformate: `formats.ts` (Versionsnummer und zod-Schema des Manifests; alte Dateien werden abgelehnt)
-// - Suche und Ausgabe: embedTexts, searchTop (Top-k-Suche; Teil 1 bis 3 rufen sie mit `DEFAULT_TOP_K` aus `shared/index.ts` auf), printStats, printHits
-// - Satzzerlegung für Teil 3: prepareSemanticChunk (Sätze und Überschriften eines vorbereiteten Chunks)
-// - Fragen-Index aus Teil 4: Fortsetzen und atomares Speichern (readQuestionIndex, appendQuestionChunk)
-// - Kinder für Teil 5: splitIntoChildren (Lektion 05, Teil 5 und Lektion 07, Teil 4 importieren es von hier)
+// Gemeinsame Hilfen für Lektion 04: alles, was in allen Teilen gleich sein muss, damit die Ergebnisse
+// vergleichbar bleiben (Frage, Chunks lesen, an Überschriften schneiden, einbetten, suchen, ausgeben,
+// Fragen-Index fortsetzen, Kinder bilden). Index lesen/schreiben und Ranking: shared/index.ts.
+// Erklärt: lessons/04-chunking/GUIDE.de.md
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,8 +12,8 @@ import { contentDirectory } from '../shared/paths.ts';
 import { MANIFEST_FILE, manifestSchema, type Manifest } from './formats.ts';
 import { embeddings, indexFileFor, readIndex, rankEntries, writeIndex, indexCommands, requireEntries, chunkKey, questionEntrySchema, INTERNAL_DOCUMENTS, HEADING_SEPARATOR, sectionPath, type ChunkMetadata, type IndexEntry, type QuestionEntry } from '../shared/index.ts';
 
-// Alle Teile stellen dieselbe Frage; nur die Art, wie die Chunks geschnitten wurden, unterscheidet
-// sich. Ändere sie hier, um eine eigene auszuprobieren.
+// Standard: 'Wie begrenze ich Prompt Injection?'. Alle Teile stellen dieselbe Frage; nur das Schneiden
+// unterscheidet sich.
 export const DEMO_QUESTION = 'Wie begrenze ich Prompt Injection?';
 
 export async function embedTexts(texts: string[]): Promise<number[][]> {
@@ -33,12 +24,11 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
 // Die vorbereiteten Chunks aus Teil 0: mehrere Dateien pro Dokument, benannt `<Dokument>--<Nummer>.md`.
 export const CHUNK_DIRECTORY = join(contentDirectory, 'owasp-genai-top-10', 'chunks');
-// Für welche Dokumente Teil 1 bis 3 die Detailausgabe zeigen (Chunk-Tabellen, in Teil 3 auch Abstände
-// und Schnitte): `ALL_DOCUMENTS = false` = nur EXAMPLE_DOCUMENT, true = alle (längere Ausgabe).
-// ALL_DOCUMENTS ändert nur die Ausgabe, nie den Index; EXAMPLE_DOCUMENT wählt zusätzlich das Dokument
-// für Teil 4 bei FULL_CORPUS = false. Ein Wert für ALL_DOCUMENTS in `.env` (true oder false) überschreibt
-// die Konstante; das Programm meldet das.
+// Standard: '01-llm01-prompt-injection.md'. Dokument für die Tabellen von Teil 1–3 und für Teil 4
+// bei FULL_CORPUS = false.
 export const EXAMPLE_DOCUMENT = '01-llm01-prompt-injection.md';
+// Standard: false. true zeigt die Tabellen aller Dokumente (nur Ausgabe, nie der Index).
+// Ein Wert in `.env` (true oder false) überschreibt die Konstante; das Programm meldet das.
 export const ALL_DOCUMENTS = false;
 // Die Ausgabe der OWASP-Liste. Sie gehört zum Korpus, deshalb bekommt jeder Chunk denselben Wert.
 export const CORPUS_VERSION = '2025';
@@ -114,15 +104,9 @@ export const metadataFor = (source: string, position: number, { headingPath, chu
 // Pfad davor (previewText ist die Variante für Chunks ohne Pfad).
 export const previewChunk = ({ headingPath, text }: Chunk) => text.slice(headingPath?.join(HEADING_SEPARATOR).length ?? 0).trim().slice(0, 60).replace(/\s+/g, ' ');
 
-/**
- * Schneidet einen Markdown-Text an seinen Überschriften (# bis ###). Eine Überschrift ohne eigenen
- * Text, direkt gefolgt von einer Unterüberschrift, ergibt keinen Chunk; sie taucht nur in den
- * Überschriftenpfaden darunter auf. Das gilt auch für die Überschriften, die ein vorbereiteter
- * Chunk an seinem Anfang wiederholt, um zu sagen, wohin er gehört.
- *
- * Das ist kein Markdown-Parser: Eine Zeile, die in einem Codeblock mit "# " beginnt, würde für
- * eine Überschrift gehalten. Der Korpus enthält keine Codeblöcke.
- */
+// Schneidet Markdown an Überschriften (# bis ###). Eine Überschrift ohne eigenen Text ergibt keinen
+// Chunk, sie steht nur im Pfad darunter. Kein Markdown-Parser: "# " in einem Codeblock gälte als
+// Überschrift; der Korpus hat keine Codeblöcke.
 export function splitByHeadings(markdown: string): Chunk[] {
   // Die Überschriften über dem aktuellen Abschnitt, nach Ebene: [Titel, Abschnitt, Unterabschnitt].
   const headingStack: string[] = [];
@@ -153,8 +137,8 @@ export function splitByHeadings(markdown: string): Chunk[] {
   });
 }
 
-// Vorschau für einen reinen Text (Chunk ohne Pfad): der Anfang des eigenen Texts. Die wiederholten Überschriften werden übersprungen; sie
-// sind bei benachbarten Chunks gleich und ließen alle Vorschauen gleich aussehen.
+// Vorschau für einen Chunk ohne Pfad. Die wiederholten Überschriften fallen weg; sie sind bei
+// benachbarten Chunks gleich und ließen alle Vorschauen gleich aussehen.
 export const previewText = (text: string) =>
   text.split('\n').filter((line) => line.trim() !== '' && !line.startsWith('#')).join(' ').slice(0, 60);
 
@@ -177,9 +161,7 @@ export function printStats(file: string, entries: { text: string }[]): void {
 
 export async function searchTop<T extends IndexEntry<unknown>>(entries: T[], topK: number) {
   requireEntries(entries, 'No entries available for search. Generate an index first.');
-  // Suchen heißt: Frage mit demselben Modell einbetten, die Kosinus-Ähnlichkeit zu jedem Eintrag
-  // berechnen, sortieren (`rankEntries` aus shared/index.ts). `DEMO_QUESTION` ist oben in dieser Datei
-  // definiert, weil jeder Teil dieser Lektion dieselbe stellt.
+  // Frage mit demselben Modell und "query: " einbetten, mit jedem Eintrag vergleichen, sortieren.
   const questionVector = await embeddings.embedQuery(`${e5Model.queryPrefix}${DEMO_QUESTION}`);
   return rankEntries(entries, questionVector, topK);
 }
@@ -200,17 +182,8 @@ export function validateQuestionEntries(entries: IndexEntry[], questionsPerChunk
   }
 }
 
-// Fortsetzbares Indizieren für Teil 4, Chunk für Chunk. Ein Chunk ist durch Dokument und Position
-// bestimmt. Nach jedem neuen Chunk wird der ganze Index geprüft und gespeichert (erst in eine
-// Temp-Datei, dann umbenannt, damit ein unterbrochenes Schreiben die Datei nicht abschneidet).
-// Ein Abbruch oder Fehler verliert höchstens den Chunk in Arbeit; der nächste Lauf überspringt
-// jeden Chunk, der schon im Index steht.
-
-/**
- * Liest den gespeicherten Index. Noch keine Datei ist der normale erste Lauf und ergibt einen
- * leeren Index. Jedes andere Problem (unlesbare Datei, ungültiger Inhalt) wird geworfen statt mit
- * einem leeren Index beantwortet, den das nächste Speichern über die alte Datei schreiben würde.
- */
+// Fortsetzbares Indizieren für Teil 4. Keine Datei = erster Lauf, leerer Index. Jedes andere Problem
+// wird geworfen: Ein leerer Index würde beim nächsten Speichern die alte Datei überschreiben.
 export function readQuestionIndex(questionsPerChunk: number): QuestionEntry[] {
   const file = indexFileFor('questions');
   try {
@@ -229,10 +202,8 @@ export function hasChunk(entries: IndexEntry[], source: string, position: number
   return entries.some(({ metadata }) => chunkKey(metadata.source, metadata.position) === chunkKey(source, position));
 }
 
-// Nach jedem Chunk speichern: Die neuen Einträge werden angehängt, alte bleiben unberührt, der
-// ganze Index wird geprüft und über writeIndex atomar geschrieben (Temp-Datei, dann umbenennen).
-// Zurückgegeben wird der neue Index; der Aufrufer ersetzt seine Liste erst nach erfolgreichem
-// Speichern, sodass Speicher und Datei übereinstimmen.
+// Nach jedem Chunk anhängen, prüfen, atomar schreiben (Temp-Datei, dann umbenennen). Der Aufrufer
+// übernimmt den neuen Index erst nach dem Speichern, damit Speicher und Datei übereinstimmen.
 export function appendQuestionChunk(entries: QuestionEntry[], chunkEntries: QuestionEntry[], questionsPerChunk: number): QuestionEntry[] {
   const nextEntries = [...entries, ...chunkEntries];
   validateQuestionEntries(nextEntries, questionsPerChunk);
@@ -254,10 +225,9 @@ export function printHits(hits: (IndexEntry & { similarity: number })[]): void {
 // Ein Kind ist ein Index-Eintrag (Text, Vektor, Metadaten) mit Verweis auf seinen Parent.
 export type Child = IndexEntry & { parent: IndexEntry };
 
-// Teilt einen Parent in Stücke von etwa `childSize` Zeichen (ein kurzer Parent bleibt ein Kind).
-// Der Überschriftenpfad steht am Anfang des Parent-Textes; er wird abgetrennt und jedem Kind
-// wieder vorangestellt, damit jedes Stück weiß, wohin es gehört. Geschnitten wird nach Zeichen, auch
-// mitten im Wort. Der Vektor fehlt noch (`Omit`): ihn setzt `buildChildren`.
+// Teilt einen Parent in Stücke von etwa `childSize` Zeichen, auch mitten im Wort. Der Pfad wird
+// abgetrennt und jedem Kind wieder vorangestellt, damit es weiß, wohin es gehört. Den Vektor
+// (`Omit`) setzt der Aufrufer nach dem Einbetten.
 export function splitIntoChildren(parent: IndexEntry, childSize: number): Omit<Child, 'vector'>[] {
   const path = parent.metadata.headingPath?.join(HEADING_SEPARATOR) ?? '';
   const body = parent.text.slice(path.length).trim();
@@ -268,12 +238,7 @@ export function splitIntoChildren(parent: IndexEntry, childSize: number): Omit<C
   });
 }
 
-
-/**
- * Der Text zwischen zwei Überschriften eines vorbereiteten Chunks. `heading` ist die Überschrift
- * (oder sind die Überschriften) davor, samt Zeilenumbrüchen, und kann leer sein. `distances` hat
- * einen Eintrag weniger als `sentences`.
- */
+/** Text zwischen zwei Überschriften; `heading` (kann leer sein) steht davor. `distances` ist eins kürzer als `sentences`. */
 export type HeadingSection = { heading: string; sentences: string[]; distances: number[] };
 /** Eine vorbereitete Chunk-Datei; ihre führenden Überschriften sind von den Abschnitten des Textes getrennt. */
 export type PreparedChunk = { chunkFile: string; leadingHeadingBlock: string; sections: HeadingSection[] };
@@ -283,25 +248,16 @@ export type PreparedChunk = { chunkFile: string; leadingHeadingBlock: string; se
 const segmenter = new Intl.Segmenter('de', { granularity: 'sentence' });
 export function prepareSemanticChunk(chunkFile: string) {
   const text = readChunk(chunkFile);
-  // Die Überschriftenzeilen am Anfang (Dokumenttitel, Abschnittsüberschriften) samt leeren Zeilen
-  // dazwischen. Sie werden nicht zerlegt und stehen vor jedem Stück, damit jedes Stück auch
-  // allein verständlich ist.
-  // Regex: ab Textanfang (`^`) beliebig viele (`*`) Zeilen, die entweder leer sind
-  // (`[ \t]*\r?\n`) oder eine Überschrift `#` bis `###` samt Zeilenende (`#{1,3}[ \t]+…`). Die erste
-  // Zeile mit echtem Text beendet den Treffer; ohne Treffer bleibt der Block leer.
+  // Die Überschriftenzeilen am Anfang (samt Leerzeilen) werden nicht zerlegt; sie stehen später vor
+  // jedem Stück. Regex: ab Textanfang beliebig viele Zeilen, die leer oder eine Überschrift sind.
   const leadingHeadingBlock = /^(?:[ \t]*\r?\n|#{1,3}[ \t]+[^\r\n]*(?:\r?\n|$))*/.exec(text)?.[0] ?? '';
   const body = text.slice(leadingHeadingBlock.length);
-  // Der Text wird vor jeder Überschriftenzeile in Abschnitte geteilt. Das Lookahead lässt die
-  // Überschrift beim Text darunter. Weder diese noch die führenden Überschriften sind Teil eines
-  // Fensters, eine Überschrift nimmt also nie an einem Abstand teil. Text vor der ersten
-  // Überschrift, falls es welchen gibt, ist ein Abschnitt ohne Überschrift.
-  // Eine Überschrift ohne Text darunter (direkt gefolgt von der nächsten) wird in
-  // `pendingHeadings` zum nächsten Abschnitt mitgenommen, damit kein Stück nur aus einer
-  // Überschrift besteht.
+  // Abschnitte beginnen vor jeder Überschrift; Überschriften sind nie Teil eines Fensters. Eine
+  // Überschrift ohne Text darunter wartet in `pendingHeadings` auf den nächsten Abschnitt, damit
+  // kein Stück nur aus einer Überschrift besteht.
   let pendingHeadings = '';
-  // Regex 1 (split): `(?=…)` ist ein Lookahead und schneidet vor jeder Zeile (`m` = Zeilenanfang
-  // gilt für `^`), die mit `#` bis `###` und einem Leerzeichen beginnt, ohne etwas zu entfernen.
-  // Regex 2 (exec): holt die Überschriftenzeile samt Zeilenende vom Anfang eines Abschnitts.
+  // split: Lookahead `(?=…)` schneidet vor jeder Überschriftenzeile, ohne sie zu entfernen.
+  // exec: holt die Überschriftenzeile vom Anfang eines Abschnitts.
   const sections = body.split(/^(?=#{1,3}[ \t]+)/m).flatMap((section) => {
     const headingLine = /^#{1,3}[ \t]+[^\r\n]*(?:\r?\n|$)/.exec(section)?.[0] ?? '';
     const sectionBody = section.slice(headingLine.length);
@@ -312,10 +268,8 @@ export function prepareSemanticChunk(chunkFile: string) {
     const heading = `${pendingHeadings}${headingLine}`;
     pendingHeadings = '';
     const sentences: string[] = [];
-    // Ein Segment nur aus Leerraum (eine Leerzeile) ist kein Satz: Es bekäme ein eigenes Fenster
-    // und einen eigenen Abstand, und das Modell hätte nichts zu vergleichen. Würde man es
-    // weglassen, verschwänden die Zeilenumbrüche aus dem Chunk-Text. Deshalb wird es an den
-    // Satz davor gehängt, oder an den nächsten, falls noch keiner kam.
+    // Eine Leerzeile ist kein Satz (sie bekäme sonst ein eigenes Fenster), darf aber nicht verloren
+    // gehen: Sie hängt am Satz davor, oder am nächsten, falls noch keiner kam.
     let leadingWhitespace = '';
     for (const { segment } of segmenter.segment(sectionBody)) {
       if (segment.trim()) {
@@ -329,9 +283,7 @@ export function prepareSemanticChunk(chunkFile: string) {
     }
     return [{ heading, sentences }];
   });
-  // Überschriften ganz am Ende haben keinen Abschnitt nach sich. Sie bleiben als eigener Abschnitt
-  // erhalten, damit kein Text des vorbereiteten Chunks verloren geht. Ein vorbereiteter Chunk mit
-  // Überschriften, aber ohne Text, ergibt am Ende gar keinen Abschnitt und keinen Chunk.
+  // Überschriften ganz am Ende bleiben als eigener Abschnitt erhalten, damit kein Text verloren geht.
   if (pendingHeadings) sections.push({ heading: pendingHeadings, sentences: [] });
   return { chunkFile, leadingHeadingBlock, sections };
 }

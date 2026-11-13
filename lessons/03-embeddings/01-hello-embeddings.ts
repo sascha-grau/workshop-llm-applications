@@ -1,31 +1,19 @@
 // Lektion 03 – Embeddings, Teil 1: Dein erstes Embedding
 //
-// Lernziel: Du verstehst, was ein Embedding ist, und misst die Ähnlichkeit zweier Sätze mit der
-// Kosinus-Ähnlichkeit.
-//
-// Ein Embedding-Modell macht aus einem Text einen Vektor, also eine lange Liste von Zahlen, die
-// seine Bedeutung beschreibt. Zwei Sätze mit ähnlicher Bedeutung, aber fast ohne gemeinsame Wörter,
-// bekommen Vektoren, die in eine ähnliche Richtung zeigen. Die Kosinus-Ähnlichkeit misst diese
-// Richtung als Zahl zwischen -1 und 1. Das Programm schickt zwei Sätze an den Server und gibt die
-// Ähnlichkeit aus: ein Aufruf, eine Zahl, kein eigener Server.
-//
-// Achtung: Das E5-Modell liefert auch für Texte ohne Zusammenhang oft hohe Werte (etwa 0,7 bis 0,8).
-// Der absolute Wert sagt wenig; entscheidend ist die Reihenfolge beim Vergleichen (siehe Teil 2).
-//
-// Modell: multilingual-e5-base (E5), Modellbeschreibung: https://huggingface.co/intfloat/multilingual-e5-base
-// Trage in .env bei REMOTE_EMBEDDING_MODEL_NAME den Namen ein, den LM Studio für das geladene Modell
-// anzeigt.
-//
-// Voraussetzungen: LM Studio läuft mit gestartetem Server und geladenem E5-Modell (REMOTE_MODEL_BASE_URL
-// und REMOTE_EMBEDDING_MODEL_NAME in .env). Burp ist
-// optional: Ist BURP_PROXY_URL gesetzt, siehst du die Texte und die rohen Vektoren in der HTTP-History.
-// Start: npm run l03:1   (oder Datei öffnen und F5 drücken)
+// Lernziel: Du machst aus zwei Sätzen Vektoren und misst ihre Ähnlichkeit mit der Kosinus-Ähnlichkeit.
+// Braucht:  LM Studio mit geladenem E5-Modell (`REMOTE_EMBEDDING_MODEL_NAME`); Burp optional.
+// Start:    npm run l03:1   (oder F5)
+// Erklärt:  lessons/03-embeddings/GUIDE.de.md → „Teil 1“
 //
 // Aufgabe:
-//   1. Ersetze textB durch einen Satz zu einem ganz anderen Thema (z. B. Fahrplan der Bahn).
+//   1. Ersetze `textB` durch einen Satz zu einem ganz anderen Thema (z. B. Fahrplan der Bahn).
 //      Wie stark sinkt der Wert, und liegt er trotzdem noch über 0,5?
-//   2. Setze textB gleich textA. Welchen Wert erwartest du, bevor du startest?
-//   3. Öffne in Burp die Antwort und suche die Zahlenliste eines Vektors (nur mit Burp).
+//      ↺ Danach den ursprünglichen Satz zurück.
+//   2. Setze `textB` gleich `textA`. Welchen Wert erwartest du, bevor du startest?
+//      ↺ Danach zurücksetzen: `git checkout -- lessons/03-embeddings/01-hello-embeddings.ts`.
+//   3. Mit Burp: Öffne die Antwort und suche die Zahlenliste eines Vektors.
+//
+// Lesen: die Zeilen `// KERN 1–2`. Der Rest ist Handwerk.
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
@@ -35,23 +23,21 @@ import { assertVectorCount, cosineSimilarity, e5Model } from '../shared/embeddin
 import { runMain } from '../shared/startup.ts';
 
 async function main() {
-  // Burp (Lektion 01, Teil 3) bleibt aktiv, falls gesetzt: Die Anfrage zeigt die gesendeten Texte und die
-  // rohen Vektoren der Antwort.
+  // Mit Burp zeigt die Anfrage die gesendeten Texte und die Antwort die rohen Vektoren.
   useBurpIfConfigured();
 
   const embeddings = new OpenAIEmbeddings({
     model: remoteEmbeddingModel.name,
     apiKey: remoteEmbeddingModel.apiKey,
-    // Der OpenAI-Client verlangt standardmäßig base64-kodierte Vektoren. Gewöhnliche Fließkommazahlen
-    // lassen sich in Burp lesen und funktionieren mit jedem OpenAI-kompatiblen Server.
+    // Der OpenAI-Client verlangt sonst base64-kodierte Vektoren. Fließkommazahlen lassen sich in Burp lesen
+    // und funktionieren mit jedem OpenAI-kompatiblen Server.
     encodingFormat: 'float',
     // Wiederholungen würden in Burp als verwirrende doppelte Anfragen auftauchen; lieber sofort scheitern.
     maxRetries: 0,
     configuration: { baseURL: remoteEmbeddingModel.baseURL },
   });
 
-  // Ähnliche Bedeutung, fast keine gemeinsamen Wörter: Eine Stichwortsuche würde diese beiden Sätze
-  // nicht verbinden.
+  // Ähnliche Bedeutung, fast keine gemeinsamen Wörter: Eine Stichwortsuche würde sie nicht verbinden.
   const textA = 'Nach einem langen Arbeitstag freute sich Lisa auf eine Tasse heißen Kamillentee.';
   const textB = 'Entspannung nach einem anstrengenden Tag mit einem warmen Getränk.';
 
@@ -59,26 +45,23 @@ async function main() {
 
   try {
     await logInvocation('Embedding', { model: remoteEmbeddingModel.name }, async () => {
-      // E5-Modelle sind mit einem Präfix trainiert, das die Rolle eines Texts markiert: "passage: "
-      // für gespeicherte Dokumente, "query: " für Suchanfragen (mehr dazu in Teil 3). Hier werden zwei
-      // gleichberechtigte Sätze verglichen, deshalb bekommen beide "query: ". Ohne Präfix werden die
-      // Ähnlichkeiten schlechter.
-      // NEU: embedDocuments schickt mehrere Texte in einer Anfrage und liefert je Text einen Vektor.
+      // KERN 1: Eine Anfrage, zwei Texte, zwei Vektoren. Beide bekommen "query: ": E5 ist mit Rollen-Präfixen
+      // trainiert (Teil 3), und hier werden zwei gleichberechtigte Sätze verglichen, keine Frage mit einem Dokument.
       const vectors = await embeddings.embedDocuments([
         `${e5Model.queryPrefix}${textA}`,
         `${e5Model.queryPrefix}${textB}`,
       ]);
       assertVectorCount(vectors, 2);
       const [vectorA, vectorB] = vectors;
-      // NEU: Kosinus-Ähnlichkeit der beiden Vektoren (1 = gleiche Richtung; bei E5 liegen auch
-      // unverwandte Texte oft bei 0,7–0,8).
+      // KERN 2: Kosinus-Ähnlichkeit der beiden Vektoren: 1 = gleiche Richtung. Bei E5 liegen auch unverwandte
+      // Texte hoch; erst der Vergleich in Teil 2 zeigt, was die Zahl bedeutet.
       const similarity = cosineSimilarity(vectorA, vectorB);
       console.log(`Cosine similarity: ${similarity.toFixed(3)}`);
     });
   } catch {
+    // logInvocation hat den Fehler schon protokolliert; es bleibt nur der Exit-Code.
     process.exitCode = 1;
   }
 }
 
-// Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.
 await runMain(main);

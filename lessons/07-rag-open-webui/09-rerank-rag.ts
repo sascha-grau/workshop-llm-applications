@@ -1,44 +1,32 @@
 // Lektion 07 – RAG, Teil 9: RAG mit Reranking
 //
-// Lernziel: Du siehst, wie das Reranking mit dem Sprachmodell (Lektion 06, Teil 5) die Quellen im
-// RAG-Ablauf verbessert und was es pro Frage kostet.
-//
-// Gegenüber Teil 8 (`08-hybrid-rag.ts`) kommt ein Schritt dazu: `rerankRetrieval` (aus
-// `qdrant-retrieval.ts`) holt per Hybrid-Suche die besten `CANDIDATES` Chunks, lässt das Chat-Modell
-// jeden einzeln mit einer Zahl von 0 bis 10 bewerten (pointwise, nur die ersten `TEXT_LIMIT`
-// Zeichen des Chunks) und liefert die besten `TOP_K` nach dieser Zahl. Schlägt eine Bewertung fehl
-// (z. B. kein gültiges JSON), zählt der Chunk als -1 und rutscht ans Ende, statt die Antwort
-// abzubrechen. Das Reranking sortiert nur um: Was nicht unter den `CANDIDATES` steht, kommt nicht
-// in den Prompt. Es kostet pro Frage `CANDIDATES` zusätzliche Modellaufrufe, bevor die Antwort
-// beginnt; in Open WebUI wartest du spürbar länger auf das erste Wort.
-//
-// Es kann immer nur ein Teil von Lektion 07 laufen (gleicher Port, FACADE_PORT): Beende vorher
-// den anderen mit Strg+C. In Open WebUI erscheint dieser Teil als Modell `lesson-07-rerank`; lade
-// bei Bedarf die Modellliste neu.
-//
-// Voraussetzungen: wie Teil 8: Qdrant läuft, die Collection ist geladen (`npm run l06:1`, braucht
-// `npm run l04:2`), LM Studio läuft mit Chat- und E5-Modell, Open WebUI zeigt auf die Fassade. Burp
-// ist optional und zeigt jeden Bewertungsaufruf an das Chat-Modell.
-// Start: npm run l07:9
+// Lernziel: Das Chat-Modell bewertet die Hybrid-Treffer neu (Lektion 06, Teil 5), bevor es antwortet.
+// Braucht:  Qdrant mit der Collection aus `npm run l06:1`, LM Studio mit Chat- und E5-Modell, Open WebUI.
+//           Nur ein Teil von Lektion 07 zur Zeit (gleicher FACADE_PORT): den laufenden mit Strg+C beenden.
+//           `SHOW_THINKING` leer oder false, sonst scheitert jede Bewertung (JSON): Hybrid-Reihenfolge.
+// Start:    npm run l07:9   (oder F5), Modell `lesson-07-rerank`
+// Erklärt:  lessons/07-rag-open-webui/GUIDE.de.md → „Teil 9“
 //
 // Aufgabe:
-//   1. Stelle dieselbe Frage in Teil 8 und Teil 9. Vergleiche `RAG sources`: Welche Chunks steigen
-//      auf, welche fallen ab? Wie viel länger dauert es bis zum ersten Wort?
-//   2. Lies in Burp (oder in den Logzeilen `LLM reranking`) die Bewertung eines Chunks, der stark
-//      gefallen ist. Ist die Zahl nachvollziehbar?
-//   3. Setze `CANDIDATES` auf `TOP_K` (5). Warum ändert das Reranking dann nur noch die
-//      Reihenfolge der Quellen, nicht mehr ihre Auswahl?
+//   1. Frage "Was ist PoisonGPT?" hier und in Teil 8: Welche Quellen steigen auf, welche fallen weg?
+//      Mit Burp: Ist die Bewertung (`{"score": …}`) eines weggefallenen Chunks nachvollziehbar?
+//   2. `RERANK_THINKING` in `qdrant-retrieval.ts` auf `false`, neu starten, dieselbe Frage: Wie schnell
+//      kommt die Antwort, welche Bewertungen zeigt Burp, bleiben die Quellen?
+//      ↺ Danach `RERANK_THINKING` auf `true` und neu starten.
+//   3. `CANDIDATES` auf 5 (= `TOP_K`), neu starten: Warum ändert sich nur noch die Reihenfolge?
+//      ↺ Danach `CANDIDATES` auf 8 und neu starten.
+//
+// Lesen: die Zeile `// KERN 1`. Der Rest ist wie in Teil 8.
 import { createRagAnswer, startRag } from './rag.ts';
 import { getCollectionName, rerankRetrieval, requireCollection } from './qdrant-retrieval.ts';
 import { runMain } from '../shared/startup.ts';
 
-// Name, unter dem die Fassade das Modell in Open WebUI anbietet.
 const ADVERTISED_MODEL = 'lesson-07-rerank';
-// So viele Chunks kommen nach dem Reranking als Kontext in den Prompt.
+// Standard: 5. So viele Chunks kommen nach dem Reranking in den Prompt.
 const TOP_K = 5;
-// So viele Kandidaten der Hybrid-Suche bewertet das Chat-Modell: ein Modellaufruf je Kandidat und Frage.
+// Standard: 8. Ein Modellaufruf je Kandidat und Frage; was hier fehlt, kann nicht aufsteigen.
 const CANDIDATES = 8;
-// Nur die ersten so vielen Zeichen eines Chunks sieht das Modell bei der Bewertung.
+// Standard: 400. So viele Zeichen eines Chunks sieht das Modell bei der Bewertung.
 const TEXT_LIMIT = 400;
 // Wie in Teil 8: Kandidaten je Liste und RRF-Dämpfung der Hybrid-Suche davor.
 const CANDIDATES_PER_LIST = 20;
@@ -49,7 +37,7 @@ async function main() {
   await requireCollection(getCollectionName());
   await startRag({
     advertisedModel: ADVERTISED_MODEL,
-    // Der Index ist leer (`[]`): Die Suche läuft in Qdrant, nicht im Speicher.
+    // KERN 1: Hybrid-Suche wie in Teil 8, dann bewertet das Chat-Modell jeden Kandidaten mit 0 bis 10.
     answer: createRagAnswer([], TOP_K, rerankRetrieval(CANDIDATES, TEXT_LIMIT, CANDIDATES_PER_LIST, RRF_K)),
   });
 }

@@ -1,47 +1,19 @@
 // Lektion 08 – Evaluierung, Teil 4: Regression – jeden Lauf speichern und mit dem letzten vergleichen
 //
-// Lernziel: Du speicherst jede Messung und vergleichst sie mit der vorigen. So siehst du, ob eine
-// Änderung (anderes k, anderes Chunking, anderes Modell) die Suche besser oder schlechter macht,
-// und erkennst eine Verschlechterung (Regression), bevor sie in den Betrieb geht.
-//
-// Teil 1 liefert zwei Zahlen. Eine einzelne Zahl sagt aber wenig: Ist eine Trefferquote von 0,83
-// gut? Das zeigt erst der Vergleich mit dem Lauf davor. Dieser Teil misst wie Teil 1, schreibt das
-// Ergebnis als JSON-Datei nach `results/lesson-08-regression/` und zeigt die Differenz zum jüngsten
-// gespeicherten Lauf. Schritte:
-//   1. Index und Fragen-Set laden: der Überschriften-Index aus Lektion 04, Teil 2, vollständig wie
-//      in Teil 1, und das Fragen-Set aus Lektion 05.
-//   2. Vorlauf laden: die jüngste Datei in `RESULTS_DIRECTORY`, falls es eine gibt.
-//   3. Messen: Trefferquote und MRR über alle Fragen mit erwartetem Dokument (`measureRetrieval`,
-//      dieselbe Rechnung wie Teil 1).
-//   4. Vergleichen: Tabelle mit Vorlauf, diesem Lauf und Differenz; Hinweis, wenn die Läufe nicht
-//      vergleichbar sind (anderes Modell, anderer Index, andere Zahl von Fragen).
-//   5. Speichern: dieser Lauf als neue Datei, benannt nach Datum und Uhrzeit.
-//
-// KERN: Vergleichbar sind zwei Läufe nur, wenn sich genau eine Sache geändert hat. Jeder Lauf
-// speichert deshalb nicht nur seine Zahlen, sondern auch, womit er gemessen hat: Embedding-Modell,
-// Index, `TOP_K` und die Zahl der Fragen. Ändert sich mehr als das, was du prüfen willst, misst
-// die Differenz zwei Dinge auf einmal.
-//
-// Merke: Die Suche ist deterministisch: Ohne Änderung ergibt ein neuer Lauf dieselben Zahlen, jede
-// Differenz kommt also von deiner Änderung. In einer Build-Pipeline (CI) würde ein Rückgang den
-// Build scheitern lassen; hier meldet das Programm ihn nur und endet normal, denn ein Rückgang ist
-// ein Messergebnis, kein Programmfehler. Der Ordner `results/` steht in `.gitignore`: Die Läufe
-// gehören zu deinem Rechner, wie die Indizes.
-//
-// Voraussetzungen: wie Teil 1. LM Studio läuft mit gestartetem Server und geladenem E5-Modell;
-// der Index aus Lektion 04, Teil 2 muss existieren (erst `npm run l04:0`, dann `npm run l04:2`).
-// Ein Chat-Modell und Open WebUI braucht dieser Teil nicht. Burp ist optional.
-// Start: npm run l08:4   (oder Datei öffnen und F5 drücken)
+// Lernziel: Du erkennst eine Verschlechterung (Regression) im Vergleich mit dem vorigen Lauf.
+// Braucht:  wie Teil 1 (LM Studio mit E5-Modell, Index aus `npm run l04:2`).
+// Schreibt: je Lauf eine JSON-Datei nach `results/lesson-08-regression/`; der nächste Lauf liest sie.
+// Start:    npm run l08:4   (oder F5)
+// Erklärt:  lessons/08-evaluations/GUIDE.de.md → „Teil 4“
 //
 // Aufgabe:
-//   1. Starte das Programm zweimal, ohne etwas zu ändern. Was zeigt der Vergleich beim zweiten
-//      Lauf? (Erwartung: Beide Kennzahlen "unchanged", denn die Suche ist deterministisch.)
-//   2. Setze `TOP_K` auf 3 und starte erneut. Welche Kennzahl sinkt, welche kaum, und meldet das
-//      Programm eine Regression? Setze `TOP_K` danach zurück auf 5 und vergleiche noch einmal.
-//      (Erwartung: Die Trefferquote sinkt eher als der MRR, siehe Teil 1, Aufgabe 2.)
-//   3. Ergänze in `../05-retrieval-strategies/question-set.json` eine eigene Frage (wie in Teil 1,
-//      Aufgabe 3) und starte erneut. Warum warnt das Programm, dass die Läufe nicht vergleichbar
-//      sind, und was müsstest du tun, um die Wirkung einer Änderung trotzdem sauber zu messen?
+//   1. Sage vorher, was der Vergleich zeigt, wenn du zweimal ohne Änderung startest. Prüfe es dann.
+//   2. Setze `TOP_K` auf 3 und starte. Welche Kennzahl sinkt, meldet das Programm eine Regression?
+//      ↺ Danach zurücksetzen: `TOP_K` auf `5` und einmal starten (neuer Vergleichslauf).
+//   3. Ergänze eine Frage in `../05-retrieval-strategies/question-set.json` und starte. Warum warnt es?
+//      ↺ Danach die Frage löschen und einmal starten (die Datei ist geteilt mit l05:5, l08:1 bis l08:6).
+//
+// Lesen: die Zeilen `// KERN 1–4`. Der Rest ist Handwerk.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -54,17 +26,16 @@ import { loadIndex, loadQuestionSet, INDEX_STRATEGY } from '../05-retrieval-stra
 import { measureRetrieval } from './evaluation.ts';
 import { runMain } from '../shared/startup.ts';
 
-// Ändere `TOP_K` (etwa auf 3) und starte erneut: Die Differenz zum Vorlauf zeigt, was die Änderung bewirkt.
+// Standard: 5, wie Teil 1. Kleiner = niedrigere Trefferquote.
 const TOP_K = 5;
-// Hier liegen die gespeicherten Läufe, eine JSON-Datei je Lauf. Ein eigener Ordner je Teil, damit
-// nur Läufe dieser Messung verglichen werden.
+// Eigener Ordner, damit nur Läufe dieser Messung verglichen werden. Steht in `.gitignore`.
 const RESULTS_DIRECTORY = rootPath('results', 'lesson-08-regression');
-// Kleinere Differenzen gelten als unverändert: Die Kennzahlen werden mit zwei Nachkommastellen
-// gezeigt, und Rundungsreste sollen keine Regression melden.
+// Standard: 0.005. Kleinere Differenzen gelten als unverändert, damit Rundungsreste der zwei
+// angezeigten Nachkommastellen keine Regression melden. Größer = toleranter.
 const TOLERANCE = 0.005;
 
-// Ein gespeicherter Lauf: womit gemessen wurde und was herauskam. Die Datei kommt von der Platte
-// und kann von Hand geändert worden sein, deshalb prüft das Schema sie beim Lesen.
+// KERN 2: Ein Lauf speichert neben den Zahlen, womit gemessen wurde. Nur so lässt sich später
+// prüfen, ob sich genau eine Sache geändert hat. Die Datei kann von Hand geändert sein: Schema.
 const runSchema = z.object({
   createdAt: z.string(),
   embeddingModel: z.string(),
@@ -77,24 +48,21 @@ const runSchema = z.object({
 type Run = z.infer<typeof runSchema>;
 
 async function main() {
-  // Burp (Lektion 01, Teil 3) bleibt aktiv, falls gesetzt: Er zeigt je Frage eine Anfrage an das
-  // Embedding-Modell.
   useBurpIfConfigured();
 
-  // Schritt 1: Index vollständig laden wie in Teil 1 (Frage F-11 erwartet den internen Anhang)
-  // und das Fragen-Set aus Lektion 05.
+  // Vollständig wie in Teil 1 (F-11 erwartet den internen Anhang).
   const index = loadIndex();
   const questionSet = loadQuestionSet();
   console.log(`Index: ${index.length} chunks from ${indexFileFor(INDEX_STRATEGY)}`);
 
-  // Schritt 2: Vorlauf laden, vor der Messung: Ist die Datei kaputt, bricht das Programm ab, bevor
-  // es Anfragen schickt. Der Ordner entsteht beim ersten Lauf.
+  // KERN 1: Vorlauf laden, vor der Messung: Ist die Datei kaputt, bricht das Programm ab, bevor es
+  // Anfragen schickt.
   mkdirSync(RESULTS_DIRECTORY, { recursive: true });
   const previous = loadLatestRun();
 
   await checkModelServer({ viaBurp: true });
 
-  // Schritt 3: Messen, dieselbe Rechnung wie Teil 1.
+  // Dieselbe Rechnung wie Teil 1, nur ohne Tabelle (`measureRetrieval` in evaluation.ts).
   let scores;
   try {
     scores = await measureRetrieval(index, questionSet.questions, TOP_K);
@@ -111,7 +79,6 @@ async function main() {
     ...scores,
   };
 
-  // NEU: Schritt 4: Vergleichen.
   if (previous) {
     compareRuns(previous.run, run, previous.file);
   } else {
@@ -119,15 +86,13 @@ async function main() {
     console.log(`Hit ratio: ${run.hitRatio.toFixed(2)} · MRR: ${run.mrr.toFixed(2)} (top-${run.topK}, ${run.questionCount} questions)`);
   }
 
-  // Schritt 5: Speichern. Der Dateiname ist Datum und Uhrzeit (ohne ":", das Windows nicht
-  // erlaubt); so sortiert der jüngste Lauf alphabetisch nach hinten.
+  // Dateiname = Zeitstempel ohne ":" (Windows verbietet es); so sortiert der jüngste Lauf nach hinten.
   const file = join(RESULTS_DIRECTORY, `${run.createdAt.replaceAll(':', '-')}.json`);
   writeFileSync(file, `${JSON.stringify(run, null, 2)}\n`);
   console.log(`Saved: ${file}`);
 }
 
-// Liest den jüngsten gespeicherten Lauf oder `undefined`, wenn es noch keinen gibt. Eine kaputte
-// Datei bricht mit einer klaren Meldung ab, statt still einen falschen Vergleich zu rechnen.
+// Eine kaputte Datei bricht mit klarer Meldung ab, statt still einen falschen Vergleich zu rechnen.
 function loadLatestRun(): { file: string; run: Run } | undefined {
   const latest = readdirSync(RESULTS_DIRECTORY).filter((name) => name.endsWith('.json')).sort().at(-1);
   if (!latest) return undefined;
@@ -143,10 +108,10 @@ function loadLatestRun(): { file: string; run: Run } | undefined {
   return { file, run: parsed.data };
 }
 
-// KERN: Zeigt Vorlauf, diesen Lauf und die Differenz und meldet eine Regression, wenn eine
-// Kennzahl um mehr als `TOLERANCE` sinkt. Vorher prüft sie, ob die Läufe überhaupt vergleichbar sind.
 function compareRuns(previous: Run, current: Run, previousFile: string): void {
   console.log(`Previous run: ${previousFile}`);
+  // KERN 3: Erst prüfen, ob die Läufe vergleichbar sind. Ändert sich mehr als eine Sache, misst die
+  // Differenz zwei Dinge auf einmal.
   const differences = [
     previous.embeddingModel !== current.embeddingModel && 'embedding model',
     previous.indexStrategy !== current.indexStrategy && 'index',
@@ -156,7 +121,6 @@ function compareRuns(previous: Run, current: Run, previousFile: string): void {
     console.log(`Warning: the runs differ in ${differences.join(', ')}; the change below does not measure one change alone.`);
   }
 
-  // Differenz mit Vorzeichen; Anzahlen ganzzahlig (`digits` 0), Kennzahlen mit zwei Nachkommastellen.
   const change = (before: number, after: number, digits = 2) => {
     const delta = after - before;
     return Math.abs(delta) < TOLERANCE ? 'unchanged' : `${delta > 0 ? '+' : ''}${delta.toFixed(digits)}`;
@@ -168,6 +132,8 @@ function compareRuns(previous: Run, current: Run, previousFile: string): void {
     { measure: 'MRR', previous: previous.mrr.toFixed(2), current: current.mrr.toFixed(2), change: change(previous.mrr, current.mrr) },
   ]);
 
+  // KERN 4: Regression = eine Kennzahl sinkt um mehr als `TOLERANCE`. Ein Messergebnis, kein
+  // Programmfehler, deshalb Exit-Code 0 (in CI würde man hier den Build scheitern lassen).
   const dropped = [
     current.hitRatio < previous.hitRatio - TOLERANCE && 'hit ratio',
     current.mrr < previous.mrr - TOLERANCE && 'MRR',
@@ -177,5 +143,4 @@ function compareRuns(previous: Run, current: Run, previousFile: string): void {
     : 'No regression: no measure dropped compared with the previous run.');
 }
 
-// Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.
 await runMain(main);

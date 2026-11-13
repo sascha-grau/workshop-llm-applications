@@ -1,40 +1,19 @@
 // Lektion 04 – Chunking, Teil 2: An der Dokumentstruktur schneiden
 //
-// Lernziel: Du schneidest Dokumente an ihren Überschriften und siehst, warum kleinere, thematisch
-// reine Chunks besser gefunden werden.
-//
-// Teil 1 (`01-prepared-chunks.ts`) liest vorbereitete Chunks und bettet sie unverändert ein. Hier
-// schneidet das Programm diese Chunks weiter, an den Markdown-Überschriften: Jeder Abschnitt wird
-// ein Chunk. Jeder Chunk beginnt mit seinem Überschriftenpfad (Dokumenttitel › Abschnitt ›
-// Unterabschnitt), damit er auch allein verständlich ist. Dieser Pfad wird später in Lektion 07
-// (RAG) als Quellenangabe angezeigt.
-//
-// Das Programm braucht kein eigenes Token-Limit: Teil 0 hat jeden vorbereiteten Chunk gegen das
-// Limit des Embedding-Modells geprüft, und Schneiden an Überschriften macht Chunks nur kleiner. Der
-// Preis: Ein Abschnitt, den Teil 0 auf zwei vorbereitete Chunks verteilen musste, bleibt auch
-// hier zwei Chunks.
-//
-// Das Programm zeigt die Chunks von `EXAMPLE_DOCUMENT` (mit `ALL_DOCUMENTS = true` in chunking.ts
-// oder in `.env` die aller indizierten Dokumente; nur die Ausgabe), bettet den Korpus ein, schreibt
-// Text, Metadaten und Vektor in die Indexdatei und durchsucht sie mit der Frage aus Teil 1.
-//
-// Vergleiche die drei Treffer mit denen aus Teil 1: Ein vorbereiteter Chunk füllt das Token-Limit
-// und mischt mehrere Abschnitte, sein Vektor ist ein Mittelwert aus allen. Ein Chunk mit genau
-// einem Abschnitt hat einen Vektor für genau dieses Thema, und eine Frage dazu findet ihn direkt.
-//
-// Dieser Index (`headings`) ist die Grundlage von Lektion 05 bis 08: Die Retrieval-Strategien, Hybrid-Suche und Reranking (Qdrant), RAG (Teil 1) und die Evaluierung laden genau diese Datei.
-//
-// Voraussetzungen: LM Studio läuft mit gestartetem Server und geladenem E5-Modell; die
-// vorbereiteten Chunks existieren (`npm run l04:0`). Burp ist optional.
-// Start: npm run l04:2   (oder Datei öffnen und F5 drücken)
+// Lernziel: An Überschriften schneiden und sehen, warum kleine, thematisch reine Chunks besser treffen.
+// Braucht:  Chunks aus `npm run l04:0`, LM Studio mit E5.
+// Schreibt: Index `headings` – Grundlage von Teil 5 und Lektion 05 bis 08.
+// Start:    npm run l04:2   (oder F5)
+// Erklärt:  lessons/04-chunking/GUIDE.de.md → „Teil 2“
 //
 // Aufgabe:
-//   1. Ändere die Überschriftentiefe: Setze in `splitByHeadings` (chunking.ts) beide Vorkommen von
-//      `#{1,3}` auf `#{1,2}`. Wie ändert sich die Zahl der Chunks, und was passiert mit den Treffern?
-//   2. Trage in `SUBSET` einen Dokumentnamen ein (z. B. den von EXAMPLE_DOCUMENT), dann läuft das
-//      Einbetten schneller.
-//      Setze `SUBSET` danach wieder auf `[]` und starte `npm run l04:2` neu, sonst kennen Lektion 05 bis 08 nur dieses Dokument.
-//   3. Ändere `DEMO_QUESTION` in chunking.ts und vergleiche die besten drei Treffer (`DEFAULT_TOP_K`) mit Teil 1.
+//   1. Vergleiche die Top 3 mit Teil 1: Welcher Abschnitt steht jetzt vorn, und warum?
+//   2. In `splitByHeadings` (chunking.ts) beide `#{1,3}` auf `#{1,2}`: Wie ändern sich Chunks und Treffer?
+//      ↺ Danach zurück auf `#{1,3}` und `npm run l04:2` (sonst lesen L05–L08 den groben Index).
+//   3. `SUBSET` auf ['01-llm01-prompt-injection.md']: Wie viel schneller ist das Einbetten?
+//      ↺ Danach `SUBSET` auf [] und `npm run l04:2` (sonst kennen L05–L08 nur dieses Dokument).
+//
+// Lesen: die Zeilen `// KERN 1–2`. Der Rest ist wie in Teil 1.
 import { useBurpIfConfigured } from '../shared/proxy.ts';
 import { remoteEmbeddingModel } from '../shared/config.ts';
 import { checkModelServer } from '../shared/diagnostics.ts';
@@ -44,14 +23,11 @@ import { writeIndex, readIndex, DEFAULT_TOP_K, sectionPath, type IndexEntry, typ
 import { requirePreparedChunks, embedTexts, exampleDocuments, previewChunk, metadataFor, printStats, searchTop, DEMO_QUESTION, printHits, readManifest, readChunks, sourcesFor } from './chunking.ts';
 import { runMain } from '../shared/startup.ts';
 
-// Leer heißt: der ganze Korpus. Eine Liste von Dokumentnamen indexiert nur diese Dokumente
-// (im Workshop schneller).
+// Standard: [] = der ganze Korpus. Eine Liste von Dokumentnamen indexiert nur diese (schneller).
 const SUBSET: string[] = [];
 
 async function main() {
   requirePreparedChunks();
-  // Burp (Lektion 01, Teil 3) bleibt aktiv, falls gesetzt: Jedes Dokument ist eine Anfrage, mit den Chunk-Texten hinaus
-  // und den rohen Vektoren zurück.
   useBurpIfConfigured();
 
   const manifest = readManifest();
@@ -74,17 +50,15 @@ async function main() {
       let embeddingCalls = 0;
 
       for (const source of sources) {
-        // NEU: readChunks schneidet die vorbereiteten Chunks an den Überschriften.
+        // KERN 1: readChunks schneidet die vorbereiteten Chunks an den Überschriften (`splitByHeadings`);
+        // jeder Chunk beginnt mit seinem Überschriftenpfad.
         const chunks = readChunks(source, manifest);
         if (chunks.length === 0) continue;
-        // Das Präfix sagt dem Modell, welche Rolle ein Text spielt (siehe Lektion 03, Teil 3). Es gehört
-        // zum Modell, nicht zum Dokument und ist nur Teil der Eingabe; der Index speichert den
-        // Chunk-Text mit seinem Überschriftenpfad.
+        // Eine Anfrage je Dokument. Das Präfix ist nur Eingabe, der Index speichert den Text mit Pfad.
         const vectors = await embedTexts(chunks.map(({ text }) => `${e5Model.passagePrefix}${text}`));
         embeddingCalls += 1;
-        // NEU: Die Metadaten enthalten den Überschriftenpfad (als Liste) und die Zugriffsgruppe. Die Zugriffsgruppe wird
-        // hier nur gespeichert und schützt noch nichts; gefiltert wird erst ab Lektion 05 (Teil 3). Ein Dokument,
-        // das nicht als intern geführt ist, bekommt "public", intern ist "internal".
+        // KERN 2: Metadaten mit Überschriftenpfad (als Liste) und Zugriffsgruppe ("public"/"internal").
+        // Die Zugriffsgruppe schützt hier noch nichts; gefiltert wird erst ab Lektion 05, Teil 3.
         chunks.forEach(({ headingPath, text }, position) => entries.push({
           text,
           metadata: metadataFor(source, position, { headingPath }),
@@ -95,8 +69,7 @@ async function main() {
 
       const indexFile = writeIndex('headings', entries);
       printStats(indexFile, entries);
-      // Eine Anfrage pro Dokument und kein Sprachmodell beteiligt: Das Schneiden an Überschriften
-      // kostet nur die Embeddings.
+      // Kein Sprachmodell beteiligt: Schneiden an Überschriften kostet nur die Embeddings.
       console.log(`Embedding calls: ${embeddingCalls}, LLM calls: 0`);
     });
 
@@ -111,5 +84,4 @@ async function main() {
   }
 }
 
-// Rahmen für saubere Fehlermeldungen, siehe Lektion 01, Teil 1.
 await runMain(main);

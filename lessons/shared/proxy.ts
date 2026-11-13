@@ -1,9 +1,6 @@
-// Burp-Anbindung: ein `ProxyAgent` von undici leitet HTTP-Anfragen über Burp. Ab Lektion 02 setzt
-// `useBurpIfConfigured()` ihn als globalen Dispatcher (Lektion 01, Teil 3 zeigt die lange Form mit `setGlobalDispatcher`). Ohne BURP_PROXY_URL ist `getBurpDispatcher()` undefined, die Programme
-// verbinden dann direkt, Burp ist also optional. Ist die Adresse gesetzt, muss Burp laufen.
-// Für HTTPS braucht Node das CA-Zertifikat von Burp (BURP_CA_CERT, Pfad relativ zum Repo-Root).
-// Es wird zu den normalen Root-Zertifikaten hinzugefügt, nicht an deren Stelle gesetzt.
-// Der Agent wird erst beim ersten Aufruf von `getBurpDispatcher()` gebaut und danach wiederverwendet.
+// Burp-Anbindung: undici-`ProxyAgent` als globaler Dispatcher, wenn BURP_PROXY_URL gesetzt ist (dann muss Burp
+// laufen); ohne Adresse verbinden die Programme direkt. Clients mit eigenem Agent wie Qdrant umgehen Burp
+// (docs/architecture.de.md#bekannte-grenzen). Übersicht: lessons/shared/README.de.md
 import { readFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { rootCertificates } from 'node:tls';
@@ -20,6 +17,7 @@ export function getBurpDispatcher(): ProxyAgent | undefined {
   const certificatePath = settings.burpCACert;
   let requestTls;
   if (certificatePath) {
+    // Burps CA kommt zu den normalen Root-Zertifikaten dazu, statt sie zu ersetzen. Pfad relativ zum Repo-Root.
     try {
       requestTls = { ca: [...rootCertificates, readFileSync(rootPath(certificatePath), 'utf8')] };
     } catch (cause) {
@@ -30,28 +28,22 @@ export function getBurpDispatcher(): ProxyAgent | undefined {
   return dispatcher;
 }
 
-/**
- * Macht den Burp-Agenten zum globalen Dispatcher, wenn BURP_PROXY_URL gesetzt ist: Danach läuft jede
- * ausgehende Anfrage des Programms über Burp. Ohne Adresse passiert nichts. Ab Lektion 02 ruft jedes Programm das
- * am Anfang auf; Lektion 01, Teil 3 zeigt dieselben Schritte ausgeschrieben mit `setGlobalDispatcher`.
- */
+/** Macht den Burp-Agenten zum globalen Dispatcher; ohne BURP_PROXY_URL passiert nichts. Ausgeschrieben mit
+ *  `setGlobalDispatcher`: lessons/01-preparation/03-burp-proxy.ts */
 export function useBurpIfConfigured(): void {
   const proxy = getBurpDispatcher();
   if (proxy) setGlobalDispatcher(proxy);
 }
 
-/**
- * Bricht mit einer Anleitung ab, wenn eine HTTPS-Adresse über Burp laufen soll, aber BURP_CA_CERT
- * fehlt (Lektion 02, Teil 2 ruft das für die Hacker-News-Seite auf). Ohne Zertifikat würde Node Burps
- * gefälschte Zertifikate ablehnen.
- */
+/** Bricht mit Anleitung ab, wenn HTTPS über Burp laufen soll, aber BURP_CA_CERT fehlt: Node würde Burps
+ *  gefälschte Zertifikate sonst ablehnen. */
 export function requireBurpCertificate(url: string): void {
   if (settings.burpProxyURL && new URL(url).protocol === 'https:' && !settings.burpCACert) {
     throw new Error('BURP_CA_CERT is missing for HTTPS through Burp. Export Burp’s CA certificate as DER and convert it with openssl x509 -inform der -in burp.der -out burp.pem. Set BURP_CA_CERT=burp.pem or clear BURP_PROXY_URL in .env.');
   }
 }
 
-/** Prüft per TCP-Verbindung (5 Sekunden Timeout), ob auf der Adresse aus BURP_PROXY_URL etwas lauscht. */
+/** Prüft per TCP-Verbindung mit Timeout, ob auf der Adresse aus BURP_PROXY_URL etwas lauscht. */
 export async function burpProxyReachable(): Promise<boolean> {
   const proxyURL = settings.burpProxyURL;
   if (!proxyURL) return true;

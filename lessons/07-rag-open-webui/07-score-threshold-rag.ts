@@ -1,50 +1,34 @@
 // Lektion 07 – RAG, Teil 7: RAG mit Schwellenwert
 //
-// Lernziel: Du siehst, wie ein Schwellenwert (Lektion 05, Teil 4) Fragen erkennbar macht, auf die
-// die Dokumente keine Antwort haben, und wie die Anwendung dann ehrlich "nichts gefunden" sagt.
-//
-// Gegenüber Teil 1 (`01-heading-rag.ts`, die Referenz mit dem vollständigen Ablauf) ändern sich
-// Trefferauswahl und Ablauf bei leerer Trefferliste. `thresholdRetrieval` (aus `retrieval.ts`) holt
-// die besten `MAX_K` Chunks und behält nur die mit Ähnlichkeit von mindestens `SCORE_THRESHOLD`;
-// die Zahl der Treffer ist also offen. Bleibt keiner übrig, ruft `createRagAnswer` das Sprachmodell
-// gar nicht erst auf, sondern schickt die feste deutsche Antwort `NO_SOURCES_ANSWER`. Das Modell
-// kann so nicht aus unpassendem Kontext raten. Beachte: Die Zeile `RAG sources` ist dann leer, und
-// im System-Prompt steht bei Treffern "[1] bis [N]" mit N = Zahl der Treffer, nicht `MAX_K`.
-// Der Wert 0,83 passt zum E5-Modell und zu diesem Korpus (siehe Lektion 05, Teil 4 und 5).
-//
-// Es kann immer nur ein Teil von Lektion 07 laufen (gleicher Port, FACADE_PORT): Beende vorher
-// den anderen mit Strg+C. In Open WebUI erscheint dieser Teil als Modell
-// `lesson-07-score-threshold`; lade bei Bedarf die Modellliste neu.
-//
-// Voraussetzungen: wie Teil 1, mit dem Index aus Lektion 04, Teil 2 (erst `npm run l04:0`, dann
-// `npm run l04:2`). Burp ist optional.
-// Start: npm run l07:7
+// Lernziel: Ein Schwellenwert (Lektion 05, Teil 4) erkennt Fragen ohne passende Quelle und antwortet fest.
+// Braucht:  Index aus `npm run l04:0` und `npm run l04:2`, sonst wie Teil 1.
+//           Nur ein Teil von Lektion 07 zur Zeit (gleicher FACADE_PORT): den laufenden mit Strg+C beenden.
+// Start:    npm run l07:7   (oder F5), Modell `lesson-07-score-threshold`
+// Erklärt:  lessons/07-rag-open-webui/GUIDE.de.md → „Teil 7“
 //
 // Aufgabe:
-//   1. Stelle die Frage aus Teil 1, Aufgabe 1 ("Wie wird das Wetter morgen?"). Was antwortet jetzt
-//      die Anwendung, und was zeigt `RAG sources`? Vergleiche mit Teil 1: Dort kommen
-//      trotzdem Quellen, hier ruft die Anwendung das Modell für die Antwort nicht auf.
-//   2. Stelle eine Frage, deren Antwort in den Dokumenten steht, aber in anderen Worten
-//      ("Wie plaudert ein Modell geheime Anweisungen aus?"). Wie viele Quellen kommen, und wird
-//      sie vom Schwellenwert fälschlich abgewiesen?
-//   3. Setze `SCORE_THRESHOLD` auf 0,7 und auf 0,9. Wie verhalten sich Frage 1 und Frage 2 jeweils?
-//      Warum trennt kein Wert beide Gruppen sauber (siehe Lektion 05, Teil 5)?
+//   1. Frage "Wie plaudert ein Modell geheime Anweisungen aus?": Kommt sie durch, mit wie vielen Quellen?
+//   2. `SCORE_THRESHOLD` auf 0.7, dann auf 0.9, je neu starten, Frage 1 und "Wie wird das Wetter morgen?":
+//      Trennt ein Wert beide Fragen sauber?
+//      ↺ Danach `SCORE_THRESHOLD` auf 0.83 und neu starten.
+//
+// Lesen: die Zeilen `// KERN 1–2`. Der Rest des Ablaufs ist wie in Teil 1.
 import { createRagAnswer, loadRagIndex, startRag } from './rag.ts';
 import { NO_SOURCES_ANSWER, thresholdRetrieval } from './retrieval.ts';
 import { runMain } from '../shared/startup.ts';
 
-// Name, unter dem die Fassade das Modell in Open WebUI anbietet.
 const ADVERTISED_MODEL = 'lesson-07-score-threshold';
-// Obergrenze: höchstens so viele Chunks kommen in den Prompt, auch wenn mehr den Schwellenwert erreichen.
+// Standard: 5. Obergrenze, auch wenn mehr Chunks den Schwellenwert erreichen.
 const MAX_K = 5;
-// Mindest-Ähnlichkeit (Kosinus) eines Chunks zur Frage. Gilt nur für das E5-Modell und diesen Korpus,
-// siehe Lektion 05, Teil 4 und 5. Erreicht kein Chunk sie, antwortet die Anwendung mit `NO_SOURCES_ANSWER`.
+// KERN 1: Nur Chunks ab dieser Kosinus-Ähnlichkeit zählen; die Zahl der Treffer ist offen, auch 0.
+// Standard: 0.83. Höher = mehr Fragen ohne Quellen. Gilt nur für E5 und diesen Korpus (Lektion 05, Teil 4).
 const SCORE_THRESHOLD = 0.83;
 
 async function main() {
   const index = loadRagIndex('headings');
   await startRag({
     advertisedModel: ADVERTISED_MODEL,
+    // KERN 2: Ohne Treffer kommt `NO_SOURCES_ANSWER` ohne Modellaufruf; das Modell kann nicht raten.
     answer: createRagAnswer(index, MAX_K, thresholdRetrieval(SCORE_THRESHOLD), { noSourcesAnswer: NO_SOURCES_ANSWER }),
   });
 }
