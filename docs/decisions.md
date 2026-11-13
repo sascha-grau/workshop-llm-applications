@@ -6,7 +6,7 @@ Short decision records: context, decision, consequences. Each heading is also th
 
 | Anchor | Topic |
 |---|---|
-| [kein-structured-output](#kein-structured-output) | JSON by prompt only, no `withStructuredOutput` |
+| [kein-structured-output](#kein-structured-output) | JSON by prompt; only the `faithful` judge tries `json_schema` |
 | [judge-huelle](#judge-huelle) | `promptfoo-judge.ts` as a wrapper around the judge |
 | [eigene-faithful-pruefung](#eigene-faithful-pruefung) | Own `faithful` check instead of `context-faithfulness` |
 | [fassade-gepinnt](#fassade-gepinnt) | `ollama-api-facade-js` pinned to one fixed version |
@@ -29,6 +29,9 @@ Short decision records: context, decision, consequences. Each heading is also th
 **Decision:** The prompt only asks for JSON. `stripJsonFence` removes a Markdown fence, a zod schema validates the result. Evidence: comments in `lessons/04-chunking/04-question-generation-chunking.ts` and `lessons/08-evaluations/evaluation.ts`.
 
 **Consequences:** Invalid JSON is a normal case: Lesson 04, Part 4 skips the chunk, reranking falls back to -1, multi-query aborts the question, Lesson 08 reports "no usable verdict" or "judge format error".
+
+**Change for `faithful`:** On LM Studio, five cells of Lesson 08, Part 5 failed on invalid JSON from the judge (`qwen3.5-4b`, measured on 2026-11-13): twice a stray backtick followed the JSON, three times unescaped ASCII quotation marks stood next to „…“ inside a text. Therefore `promptfoo-faithfulness.ts` requests strict structured output (`json_schema`) while thinking is off. If it is empty or invalid, or the server rejects `response_format`, the earlier plain-text prompt applies with the same zod check (two format attempts plus one attempt for the fallback; the model object remembers the plain mode). The JSON is never read from the `reasoning` field. Evidence: on LM Studio the full run finished without `ERROR` (five before). On the author's server (`qwen3.8-4b-q4`, ignores `reasoning_effort: none`) structured output puts the JSON into the `reasoning` field, the fallback kicks in, and a single-question test ran without errors. Chat answers and all other JSON calls stay with the prompt.
+
 
 ## judge-huelle
 

@@ -27,19 +27,19 @@ Part 6 has only two checks, `source-hit` (in the source list under the answer) a
 
 ## What actually makes cells fail?
 
-Numbers from the [measurement run 2026-11-13](GUIDE.md#measurement-run-2026-11-13) in the guide. In its 29 failed cells these checks failed (one cell can have several):
+Numbers from the [measurement run 2026-11-13](GUIDE.md#measurement-run-2026-11-13) in the guide. In its 32 failed cells these checks failed (one cell can have several):
 
 | Failed check | in this many cells | of these, the **only** cause |
 |---|---|---|
-| `faithful` | 20 | 12 |
-| `correct` | 17 | 9 |
+| `faithful` | 22 | 12 |
+| `correct` | 20 | 10 |
 | `source-hit` and `mrr` (always together) | 3 | 0 |
 
 What follows from this:
 
 1. **The main reasons are `faithful` and `correct`**, not the search. The right documents are almost always found (`source-hit` column in the measurement run).
 2. **`source-hit` fails only for F-05**, in three of the four strategies. There the expected document really is not among the hits.
-3. **`faithful` fails sometimes narrowly, sometimes clearly.** Narrowly: 18 of 19, 12 of 13, 11 of 12 statements supported. Clearly mostly when the answer says what the sources do _not_ contain: for F-10 ("OWASP gives no numbers") `faithful` failed in three strategies with 1 of 2 or 2 of 6, while `correct` passed everywhere.
+3. **`faithful` fails sometimes narrowly, sometimes clearly.** Narrowly: 13 of 14, 12 of 13, 11 of 12 statements supported. Clearly mostly when the answer says what the sources do _not_ contain: for F-10 ("OWASP gives no numbers") `faithful` failed in three strategies with 1 of 2 or 2 of 6, while `correct` passed everywhere.
 
 ## Why `correct` fails although the topic is right
 
@@ -84,7 +84,7 @@ Sometimes the judge is wrong too and marks a supported statement as unsupported.
 |---|---|---|
 | `[PASS]` | All checks of the cell passed. | Nothing. |
 | `[FAIL]` | At least one check failed. The cell shows every check's reason. | Find out _which_ check failed (see below). |
-| `[ERROR]` with `judge format error` | The judge twice returned no valid JSON. This says nothing about the answer. | Accept single cases, with a 4B judge they are to be expected; if there are many, use a stronger model as judge. |
+| `[ERROR]` with `judge format error` | The judge returned no valid JSON even after several attempts. This says nothing about the answer. | Accept single cases (rare with structured output); if there are many, use a stronger model as judge. |
 | `[ERROR]` with `Context size has been exceeded` | LM Studio serves several requests in parallel, and the context is not enough for each. | Load the chat model with Parallel 1 ([Check first](GUIDE.md#check-first) in the guide). |
 | `[ERROR]` with `did not answer within … s` | The judge was too slow. | Raise `timeout` in the judge block of the YAML file. |
 | `[ERROR]` with `Cannot load index` | An index is missing. | Build the indexes from Lesson 04 (`npm run l04:0` to `l04:4`). |

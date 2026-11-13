@@ -38,7 +38,7 @@ Part 3:  Open WebUI ──► facade + your program ──► Burp ────�
 - [ ] For Part 3 (optional): Burp is running, Intercept is off ([Setting up Burp](../../README.md#setting-up-burp)).
 - [ ] `SHOW_THINKING` in `.env` is empty.
 
-All output below: measured on 2026-11-13 with LM Studio and `qwen3.5-4b` (workshop default, [Models](../../README.md#models) in the root README). The exception is Part 3 (Burp): it comes from an earlier run on the same day with `qwen3.8-4b-q4` on a different OpenAI-compatible server. With another server or model, numbers and answers differ; the flow stays the same. Timestamps and durations are shortened (`…`).
+All output below: measured on 2026-11-13 with LM Studio and `qwen3.5-4b` (workshop default, [Models](../../README.md#models) in the root README). The traffic in Part 3 was recorded not by Burp but by a small logging forwarder between the program and LM Studio; it shows the same requests and responses as Burp's HTTP history. With another server or model, numbers and answers differ; the flow stays the same. Timestamps and durations are shortened (`…`).
 
 The questions in the code are German, so the model answers in German. Ask in English and it usually answers in English.
 
@@ -208,41 +208,41 @@ At startup the program checks both ways to the model server: through Burp and di
 
 **What you see**
 
-All blocks in this part come from the earlier run with `qwen3.8-4b-q4`; the dress rehearsal did not record Burp. With LM Studio, `model` shows your identifier.
+Recorded without Burp, through the logging forwarder (see above). That is why the first check line is missing from the log; with `BURP_PROXY_URL` set, `Model API through Burp: reachable { status: 200 }` comes before it.
 
 ```text
 $ npm run l01:3
-… INFO Model API through Burp: reachable { status: 200 }
 … INFO Model API directly: reachable { status: 200 }
 … INFO Facade ready { address: 'http://127.0.0.1:11435', advertisedModel: 'lesson-01-part-3' }
 ```
 
-In Burp under Proxy → HTTP history, the request to `/v1/chat/completions` after the question "Nenne die Hauptstadt von Frankreich. Nur ein Wort." (name the capital of France, one word only; headers shortened, key redacted, messages left out):
+In Burp under Proxy → HTTP history, the request to `/v1/chat/completions` after the question "Nenne die Hauptstadt von Frankreich. Nur ein Wort." (name the capital of France, one word only; headers shortened, messages left out):
 
 ```text
 POST /v1/chat/completions HTTP/1.1
-Authorization: Bearer sk-…
+Authorization: Bearer not-required
 User-Agent: langchainjs-openai/1.0.0 (…)
 Content-Type: application/json
 
-{"model":"qwen3.8-4b-q4","stream":false,"messages":[…]}
+{"model":"qwen3.5-4b","stream":false,"messages":[…]}
 ```
 
 The answer to it (shortened):
 
 ```json
-{"object":"chat.completion","model":"qwen3.8-4b-q4","choices":[{"index":0,"finish_reason":"stop",
+{"object":"chat.completion","model":"qwen3.5-4b","choices":[{"index":0,"finish_reason":"stop",
  "message":{"role":"assistant","content":"Paris",
-  "reasoning":"Thinking Process:\n\n1.  The user asks for the capital of France …"}}],
- "usage":{"prompt_tokens":21,"completion_tokens":92,"total_tokens":113}}
+  "reasoning_content":"Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Question: \"Nenne die Hauptstadt von Frankreich.\" …",
+  "tool_calls":[]}}],
+ "usage":{"prompt_tokens":21,"completion_tokens":243,"total_tokens":264,"completion_tokens_details":{"reasoning_tokens":228}}}
 ```
 
 **What does it mean?**
 
 - Two check lines at startup: the model server is reachable through Burp and directly. If only the way through Burp fails, Burp is the problem.
-- `Authorization: Bearer …` is your API key in plain text. Redact it before you share screenshots or Burp projects.
-- `content` is the answer ("Paris"), `reasoning` is the thinking. Open WebUI shows only `content` as long as `SHOW_THINKING` is empty.
-- `usage` counts tokens: 21 for the question, 92 generated. Almost all of them are thinking for a single word.
+- `Authorization: Bearer …` is your API key in plain text. Here it says `not-required`: that placeholder is sent when `REMOTE_MODEL_API_KEY` is empty, because LM Studio needs no key. Redact a real key before you share screenshots or Burp projects.
+- `content` is the answer ("Paris"), `reasoning_content` is the thinking (other servers call the field `reasoning`). Open WebUI shows only `content` as long as `SHOW_THINKING` is empty.
+- `usage` counts tokens: 21 for the question, 243 generated, 228 of them thinking (`reasoning_tokens`) for a single word.
 - Open WebUI still gets the answer as a stream, just in one piece.
 
 **Try it:** the tasks in the header of `03-burp-proxy.ts`. Watch which parts of the request come from Open WebUI and which your program adds.

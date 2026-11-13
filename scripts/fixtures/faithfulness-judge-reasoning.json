@@ -1,0 +1,46 @@
+{
+  "reasoningOnly": {
+    "created": 1794579120,
+    "object": "chat.completion",
+    "id": "404eaf64-815b-47e9-8724-80024b74cf68",
+    "model": "qwen3.8-4b-q4",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "",
+          "reasoning": "{ \"statements\": [ \"Wasser ist bei Raumtemperatur flüssig.\" ]}"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 53,
+      "completion_tokens": 22,
+      "total_tokens": 75
+    }
+  },
+  "malformedPlain": {
+    "created": 1794579694,
+    "object": "chat.completion",
+    "id": "6b412b4f-d29c-4b41-91a1-2aa6a4c4e938",
+    "model": "qwen3.8-4b-q4",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "```json\n{\n  \"statements\": [\n    \"Die OWASP Top 10 für LLM-Anwendungen 2025 enthält die Kategorie „Offenlegung des Systems Prompts\" (System Prompt Leakage).\",\n    \"Die Kategorie System Prompt Leakage wurde hinzugefügt, um einen Bereich realer Exploits abzudecken, der von der Community stark nachgefragt wurde.\",\n    \"Viele Anwendungen gingen davon aus, dass Prompts sicher isoliert sind.\",\n    \"Jüngste Vorfälle haben gezeigt, dass Entwickler nicht davon ausgehen können, dass Informationen in Prompts vertraulich bleiben.\",\n    \"Die Kategorie Excessive Agency wurde angesichts des zunehmenden Einsatzes von Agentenarchitekturen erweitert.\",\n    \"Agentenarchitekturen können dem LLM mehr Autonomie verleihen.\",\n    \"Wenn LLMs als Agenten oder in Plugin-Umgebungen agieren, können ungeprüfte Berechtigungen zu unbeabsichtigten oder gefährlichen Aktionen führen.\",\n    \"Die Kategorie Unbounded Consumption wurde erweitert, um Risiken im Zusammenhang mit dem Ressourcenmanagement zu berücksichtigen.\",\n    \"Die Kategorie Unbounded Consumption berücksichtigt unerwartete Kosten.\",\n    \"Das Problem des Ressourcenmanagements und unerwarteter Kosten ist bei der großflächigen Einführung von LLM-Anwendungen drängend.\",\n    \"Die Kategorie Vector and Embedding Weaknesses wurde hinzugefügt.\",\n    \"Die Kategorie wurde als Reaktion auf Anfragen aus der Community nach Anleitungen zur Absicherung von Retrieval-Augmented Generation (RAG) hinzugefügt.\",\n    \"Die Kategorie wurde als Reaktion auf Anfragen aus der Community nach Anleitungen zur Absicherung von Einbettungen hinzugefügt.\",\n    \"Einbettungen-basierte Methoden gehören heute zu den grundlegenden Praktiken für die Absicherung von Modellausgaben.\",\n    \"Die Liste der OWASP Top 10 für LLM-Anwendungen 2025 wurde mit einer größeren und vielfältigeren Gruppe von Mitwirkenden weltweit erstellt.\",\n    \"Alle Mitwirkenden haben an der Gestaltung der Liste mitgewirkt.\"\n  ]\n}\n```",
+          "reasoning": "The user wants me to extract atomic, independently understandable factual statements from the given answer text and return them as a JSON array. I need to identify each distinct factual claim and present it as a separate statement.\n\nLet me identify the factual claims:\n\n1. The OWASP Top 10 for LLM applications 2025 includes \"System Prompt Leakage\" as a new category.\n2. \"System Prompt Leakage\" was added to address a real-world exploit area requested by the community.\n3. Many applications assumed prompts were securely isolated.\n4. Recent incidents showed developers cannot assume prompt information remains confidential.\n5. \"Excessive Agency\" was added to address the increasing use of agent architectures.\n6. Agent architectures can give LLMs more autonomy.\n7. Unchecked permissions in agent or plugin environments can lead to unintended or dangerous actions.\n8. \"Unbounded Consumption\" was expanded to consider resource management and unexpected cost risks.\n9. Unbounded Consumption addresses a pressing problem in the widespread introduction of LLM applications.\n10. \"Vector and Embedding Weaknesses\" was added in response to community requests for RAG and embedding-based method security guidance.\n11. Embedding-based methods are now considered fundamental practices for securing model outputs.\n12. The 2025 list was created with a larger and more diverse group of contributors worldwide.\n13. All contributors participated in the design of the list.\n\nI'll format these as atomic statements in JSON.\n"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 597,
+      "completion_tokens": 771,
+      "total_tokens": 1368
+    }
+  }
+}

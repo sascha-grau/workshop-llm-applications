@@ -291,16 +291,10 @@ Der Probelauf (`npm run l08:5 -- --filter-first-n 1`) stellt nur die erste Frage
 
 ### Messlauf 2026-11-13
 
-Der volle Lauf `npm run l08:5` (44 Zellen; LM Studio auf einer RTX 3080 Ti, `qwen3.5-4b` als Chat-Modell und Judge, geladen mit Parallel 1 und Kontext 8192; `text-embedding-multilingual-e5-base`) dauerte 6 min 59 s, knapp 10 Sekunden je Zelle. Ergebnis: 10 Zellen bestanden, 29 scheiterten, 5 endeten mit `ERROR`. Mit eigener GPU startest du ihn selbst; sonst zeigt der Trainer den Bericht eines Laufs, den er vorab gestartet hat.
+Der volle Lauf `npm run l08:5` (44 Zellen; LM Studio auf einer RTX 3080 Ti, `qwen3.5-4b` als Chat-Modell und Judge, geladen mit Parallel 1 und Kontext 8192; `text-embedding-multilingual-e5-base`) dauerte 5 min 46 s, knapp 8 Sekunden je Zelle. Ergebnis: 12 Zellen bestanden, 32 scheiterten, keine endete mit `ERROR`. Mit eigener GPU startest du ihn selbst; sonst zeigt der Trainer den Bericht eines Laufs, den er vorab gestartet hat.
 
 ```
 Running 44 test cases (up to 1 at a time)...
-Assertion grading failed during eval
-{
-  "error": "Error: judge format error (statement extraction) after 2 attempts: The judge did not return valid JSON.\n    at askWithRetry (…)",
-  …
-}
-…   (ein solcher Block je ERROR-Zelle)
 ┌─────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┐
 │ query           │ keyPoint        │ expectedSources │ [corpus:prepar… │ [corpus:headin… │ [corpus:semant… │ [corpus:questi… │
 ├─────────────────┼─────────────────┼─────────────────┼─────────────────┼─────────────────┼─────────────────┼─────────────────┤
@@ -308,23 +302,23 @@ Assertion grading failed during eval
 │ den OWASP Top   │ Verbrauch       │                 │ OWASP Top 10    │ OWASP Top 10    │ OWASP Top 10    │ OWASP Top 10    │
 │ …               │ …               │                 │ …               │ …               │ …               │ …               │
 └─────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┘
-✓ Eval complete (ID: eval-cOV-2026-11-13T09:23:01)
+✓ Eval complete (ID: eval-5xX-2026-11-13T14:24:21)
 Results:
-  ✓ 10 passed (22.73%)
-  ✗ 29 failed (65.91%)
-  ✗ 5 errors (11.36%)
-Duration: 6m 59s (concurrency: 1)
+  ✓ 12 passed (27.27%)
+  ✗ 32 failed (72.73%)
+  0 errors (0%)
+Duration: 5m 46s (concurrency: 1)
 Writing output to results/lesson-08-promptfoo/05-promptfoo-strategies.html
 ```
 
 | Provider | Zellen bestanden | `source-hit` | `mrr` | `faithful` | `correct` | Fehler |
 |---|---|---|---|---|---|---|
-| `corpus:prepared` | 2/11 | 0,90 | 0,73 | 0,83 | 0,68 | 1 |
-| `corpus:headings` | 3/11 | 0,91 | 0,85 | 0,83 | 0,69 | 0 |
-| `corpus:semantic` | 3/11 | 0,90 | 0,83 | 0,85 | 0,55 | 1 |
-| `corpus:questions` | 2/11 | 1,00 | 0,92 | 0,92 | 0,69 | 3 |
+| `corpus:prepared` | 2/11 | 0,91 | 0,76 | 0,86 | 0,62 | 0 |
+| `corpus:headings` | 3/11 | 0,91 | 0,85 | 0,76 | 0,69 | 0 |
+| `corpus:semantic` | 4/11 | 0,91 | 0,84 | 0,85 | 0,59 | 0 |
+| `corpus:questions` | 3/11 | 1,00 | 0,89 | 0,88 | 0,73 | 0 |
 
-Die Mittelwerte stehen über die geprüften Zellen; eine Fehler-Zelle hat keine Prüfergebnisse. Bei `corpus:questions` fehlen so drei Fragen (F-05, F-07, F-08). Aus den Metadaten der Antworten über alle elf Fragen nachgerechnet, liegt sein MRR bei 0,89; die Trefferquote bleibt 1,00. Alle fünf Fehler waren `judge format error (statement extraction)` nach zwei Versuchen: Beim Zerlegen der Antwort in Aussagen lieferte der Judge zweimal kein gültiges JSON. Mit einem Judge aus der 4B-Klasse sind solche Einzelfälle zu erwarten. Welche Prüfungen in den roten Zellen scheiterten, schlüsselt das [FAQ](FAQ.de.md#woran-scheitern-die-zellen-wirklich) auf.
+Die Mittelwerte stehen über alle elf Zellen je Spalte; in diesem Lauf endete keine Zelle mit `ERROR`. `source-hit` liegt bei 0,91 und verfehlt nur F-05; nur `corpus:questions` findet auch F-05 (1,00). Bei `faithful` lieferte der Judge durchweg gültiges JSON: Solange `SHOW_THINKING` aus ist, fordert der Schritt strukturierte Ausgabe an und fällt bei Bedarf auf Klartext-JSON zurück (Begründung: [docs/decisions.de.md](../../docs/decisions.de.md#kein-structured-output)). Welche Prüfungen in den roten Zellen scheiterten, schlüsselt das [FAQ](FAQ.de.md#woran-scheitern-die-zellen-wirklich) auf.
 
 **Was bedeutet das?**
 
@@ -349,7 +343,7 @@ Die Mittelwerte stehen über die geprüften Zellen; eine Fehler-Zelle hat keine 
 | Meldung in der Zelle oder im Terminal | Lösung |
 |---|---|
 | `[ERROR] Cannot load index … Generate it with npm run l04:0, then npm run l04:N.` | Den fehlenden Index erzeugen. Die anderen Spalten laufen weiter. |
-| `[ERROR] … judge format error (…) after 2 attempts: …` | Der Judge hielt das JSON-Format zweimal nicht ein. Mit einem 4B-Judge wie `qwen3.5-4b` sind einige solche Zellen zu erwarten (siehe [Messlauf](#messlauf-2026-11-13)); hinnehmen. Bei vielen ein stärkeres Modell in den Judge-Block. |
+| `[ERROR] … judge format error (…) after … attempts: …` | Der Judge hielt das JSON-Format auch nach mehreren Versuchen nicht ein. Mit der strukturierten Ausgabe von `faithful` ist das selten (siehe [Messlauf](#messlauf-2026-11-13)); Einzelfälle hinnehmen. Bei vielen ein stärkeres Modell in den Judge-Block. |
 | `[ERROR] … 400 "Engine protocol predict stream returned an error: … Context size has been exceeded. …"`, im Terminal nach `Assertion grading failed during eval` | Das Chat-Modell ist mit mehreren parallelen Anfragen geladen (Standard in LM Studio: Parallel 4); dann reicht der Kontext nicht für jede. Mit Parallel 1 neu laden (siehe [Vorher prüfen](#vorher-prüfen)) und den Lauf neu starten. |
 | `[ERROR] The judge did not answer within … s (timeout in the judge block of the YAML).` | `timeout` im Judge-Block erhöhen. |
 | `[FAIL] … Could not extract JSON from … response` (bei `correct`) | Das Urteil wurde abgeschnitten. Erst `max_tokens` im Judge-Block erhöhen, dann ein Modell nehmen, das weniger denkt. |
@@ -358,7 +352,7 @@ Die Mittelwerte stehen über die geprüften Zellen; eine Fehler-Zelle hat keine 
 
 > **Vertiefung: Warum gibt es `promptfoo-judge.ts`?** promptfoo setzt `{{ env.X }}` als Text ein, und sein OpenAI-Adapter hielte den Text `"false"` bei `showThinking` für wahr. Die Hülle setzt deshalb einen echten Boolean, bittet um `reasoning_effort: none` und begrenzt die Zeit je Urteil (`timeout`) nur für den Judge. Beide Judge-Prüfungen nutzen so denselben Block. Grundlage für `timeout` und `max_tokens`: Ein denkender Judge brauchte bis etwa 2200 Tokens je Urteil bei rund 8 Tokens pro Sekunde (gemessen am 2026-11-12 mit `qwen3.8-4b-q4`). Die Abwägung: [docs/decisions.de.md](../../docs/decisions.de.md#judge-huelle).
 
-> **Vertiefung: `faithful` wie RAGAS.** [RAGAS](https://docs.ragas.io/) ist ein verbreitetes Framework zur Evaluierung von RAG. Seine Quellentreue zerlegt die Antwort in Aussagen und prüft jede gegen den Kontext. [`promptfoo-faithfulness.ts`](promptfoo-faithfulness.ts) macht das in zwei JSON-Schritten mit streng geprüftem Schema und einem zweiten Versuch bei Formatfehlern. Die eingebaute Prüfung `context-faithfulness` von promptfoo las Klartext-Urteile: Denkschritte gerieten in die Aussagenlisten, und Formatfehler zählten still als 0. Siehe [docs/decisions.de.md](../../docs/decisions.de.md#eigene-faithful-pruefung) und das RAGAS-Paper unter [Weiterlesen](../../docs/production.de.md#weiterlesen).
+> **Vertiefung: `faithful` wie RAGAS.** [RAGAS](https://docs.ragas.io/) ist ein verbreitetes Framework zur Evaluierung von RAG. Seine Quellentreue zerlegt die Antwort in Aussagen und prüft jede gegen den Kontext. [`promptfoo-faithfulness.ts`](promptfoo-faithfulness.ts) macht das in zwei JSON-Schritten mit streng geprüftem Schema und einem zweiten Versuch bei Formatfehlern. Solange `SHOW_THINKING` aus ist, fordert jeder Schritt zuerst strukturierte Ausgabe (`json_schema`) an; liefert der Server sie leer oder lehnt er sie ab, gilt der Klartext-Prompt mit derselben Prüfung. Grund: Der Judge schrieb gelegentlich ungültiges JSON, etwa ein verirrtes Backtick nach dem JSON oder unmaskierte Anführungszeichen neben „…“ in einem Text. Das JSON wird nie aus den Denkschritten gelesen. Die eingebaute Prüfung `context-faithfulness` von promptfoo las Klartext-Urteile: Denkschritte gerieten in die Aussagenlisten, und Formatfehler zählten still als 0. Siehe [docs/decisions.de.md](../../docs/decisions.de.md#eigene-faithful-pruefung) und das RAGAS-Paper unter [Weiterlesen](../../docs/production.de.md#weiterlesen).
 
 ## Teil 6 – Die laufende Fassade als Black Box
 

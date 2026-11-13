@@ -10,6 +10,9 @@ import { askJudgeJson, JudgeFormatError, wrapUntrusted } from './evaluation.ts';
 import JudgeProvider from './promptfoo-judge.ts';
 
 const statementsSchema = z.strictObject({ statements: z.array(z.string().trim().min(1)) });
+// Modelle, bei denen strukturierte Ausgabe nicht klappte: Sie bleiben beim Klartext-Prompt, damit nicht jeder
+// Aufruf erst scheitert. Die Menge hängt am Modellobjekt, nicht am Server.
+const plainJsonModels = new WeakSet<Pick<ChatOpenAI, 'invoke'>>();
 
 const EXTRACT_PROMPT =
   'Zerlege die Antwort in <answer_under_test> in atomare, eigenständig verständliche Tatsachenaussagen. ' +
@@ -37,16 +40,25 @@ async function askWithRetry<T>(
   timeout?: number,
 ): Promise<T> {
   let feedback = '';
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  // Zwei Formatversuche, dazu ein Versuch für den Rückfall von strukturierter Ausgabe auf Klartext.
+  let maxAttempts = 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await askJudgeJson(model, prompt, content + feedback, schema, {
         timeout,
+        jsonSchema: !plainJsonModels.has(model),
         truncationHint: "Raise max_tokens in the judge block of the YAML (Part 5) or the server's output limit, or use a model that thinks less.",
       });
     } catch (error) {
       if (!(error instanceof JudgeFormatError)) throw error;
-      if (attempt === 2) {
-        throw new JudgeFormatError(`judge format error (${stage}) after 2 attempts: ${error.message}`);
+      if (error.retryWithoutSchema) {
+        plainJsonModels.add(model);
+        maxAttempts = 3;
+        feedback = '';
+        continue;
+      }
+      if (attempt === maxAttempts) {
+        throw new JudgeFormatError(`judge format error (${stage}) after ${maxAttempts} attempts: ${error.message}`);
       }
       feedback = `\n\nFormatkontrolle fehlgeschlagen: ${error.message} Wiederhole die Aufgabe vollständig im verlangten JSON-Format.`;
     }

@@ -41,7 +41,7 @@ Lektion 07 macht aus Teil 2 eine Suche: Statt einer Webseite liefert ein Index d
 - [ ] Für Teil 2: Internet. Mit gesetztem `BURP_PROXY_URL` auch `BURP_CA_CERT` ([Burp einrichten](../../README.de.md#burp-einrichten)).
 - [ ] `SHOW_THINKING` in `.env` ist leer. In Teil 3 blieben die Denkschritte sonst im Verlauf, den das Modell in der nächsten Runde liest.
 
-Alle Ausgaben unten: gemessen am 2026-11-13 mit LM Studio und `qwen3.5-4b` (Workshop-Standard, [Modelle](../../README.de.md#modelle) in der Wurzel-README). Ausnahme sind die Anfragen an das Modell (so mitgeschnitten, wie Burp sie zeigt, Header weggelassen), das Beispiel in Teil 1 und die Werkzeugaufrufe in Teil 3 und 4: Sie stammen aus einem früheren Lauf am selben Tag mit `qwen3.8-4b-q4` auf einem anderen OpenAI-kompatiblen Server und sind markiert. Mit einem anderen Server oder Modell weichen Zahlen und Antworten ab; der Ablauf bleibt gleich. Zeitstempel sind gekürzt (`…`).
+Alle Ausgaben unten: gemessen am 2026-11-13 mit LM Studio und `qwen3.5-4b` (Workshop-Standard, [Modelle](../../README.de.md#modelle) in der Wurzel-README). Die Anfragen an das Modell und seine Antworten hat statt Burp ein kleiner protokollierender Weiterleiter zwischen Programm und LM Studio mitgeschnitten; er zeigt dieselben Daten wie die HTTP-History von Burp (Header weggelassen). Mit einem anderen Server oder Modell weichen Zahlen und Antworten ab; der Ablauf bleibt gleich. Zeitstempel sind gekürzt (`…`).
 
 ## Teil 1 – Wissen und Few-Shot im Prompt
 
@@ -58,12 +58,10 @@ Die Antwort endet mit einer Quellenliste, die der Code anhängt (`formatSourceLi
 
 **Das siehst du**
 
-Beide Blöcke dieses Teils stammen aus dem früheren Lauf mit `qwen3.8-4b-q4`.
-
 Die Anfrage an das Modell nach der Frage "Was macht Ano Nym?" (gekürzt):
 
 ```json
-{"model":"qwen3.8-4b-q4","temperature":0,"stream":false,"messages":[
+{"model":"qwen3.5-4b","temperature":0,"stream":false,"messages":[
  {"role":"system","content":"Beantworte Fragen ausschließlich mit dem folgenden Kontext. Steht die Antwort nicht darin, sage das offen. Antworte auf Deutsch.\nFüge keine eigene Quellenliste an, da die Anwendung sie anhängt.\n\nKontext [1]:\nAno Nym ist ein geheimnisvoller Ethical Hacker. …"},
  {"role":"user","content":"Wie sieht Ano Nym aus?"},
  {"role":"assistant","content":"Niemand kennt das Gesicht von Ano Nym. (Quelle: Kontext)"},
@@ -75,7 +73,7 @@ Die Anfrage an das Modell nach der Frage "Was macht Ano Nym?" (gekürzt):
 Die Antwort in Open WebUI:
 
 ```text
-Ano Nym ist ein geheimnisvoller Ethical Hacker, der Sicherheitslücken in Webanwendungen und Sprachmodellen findet und diese verantwortungsvoll an die Betreiber meldet. Er veröffentlicht Berichte nur unter diesem Pseudonym und tritt nie persönlich auf Konferenzen auf. (Quelle: Kontext)
+Ano Nym findet Sicherheitslücken in Webanwendungen und Sprachmodellen und meldet sie verantwortungsvoll an die Betreiber. Er veröffentlicht Berichte nur unter diesem Pseudonym. (Quelle: Kontext)
 
 ---
 **Quellen**
@@ -130,18 +128,25 @@ Das Log nach der Frage "Was sind gerade die Top-Themen auf Hacker News?":
 … INFO Model: Call completed { messages: 1, durationMs: … }
 ```
 
-Die Anfrage an das Modell (gekürzt; früherer Lauf mit `qwen3.8-4b-q4` und der Frage "Welche drei Themen stehen heute ganz oben auf Hacker News?"):
+Die Anfrage an das Modell (gekürzt):
 
 ```json
-{"model":"qwen3.8-4b-q4","temperature":0,"stream":false,"messages":[
+{"model":"qwen3.5-4b","temperature":0,"stream":false,"messages":[
  {"role":"system","content":"Beantworte Fragen ausschließlich mit dem folgenden Kontext. … Zitiere im Text mit [1], aber füge keine eigene Quellenliste an, da die Anwendung sie anhängt."},
- {"role":"user","content":"Kontext [1] (die Titel der Hacker-News-Startseite von heute, also die aktuellen Nachrichten):\n<scraped-context>\nJensen Huang resigns\nRust 1.100\nGemini 4 Hydrogen and Orchestrator\n…\n</scraped-context>\n\nWelche drei Themen stehen heute ganz oben auf Hacker News?"}]}
+ {"role":"user","content":"Kontext [1] (die Titel der Hacker-News-Startseite von heute, also die aktuellen Nachrichten):\n<scraped-context>\nDoomsday: Friday, 13 November, A.D. 2026 (1960)\nJensen Huang resigns\nElevated errors on claude.ai, Claude Code, and platform.claude.com\n…\n</scraped-context>\n\nWas sind gerade die Top-Themen auf Hacker News?"}]}
 ```
 
 Die Antwort in Open WebUI:
 
 ```text
-Basierend auf dem bereitgestellten Kontext [1], der die Titel der Hacker-News-Startseite von heute auflistet, sind die aktuellen Themen unter anderem die Resignation des Nvidia-Chefs Jensen Huang sowie ein Petition der Mitarbeiter zur Wiederherstellung seiner Position. Ein weiterer großer Punkt ist ein globaler Microsoft-Ausfall, bei dem Outlook und 365 nach 12 Stunden immer noch nicht wieder verfügbar sind [1]. Zudem werden technische Themen wie Rust 1.100, neue KI-Modelle (z.B. Gemini 4 Hydrogen) und LLMs auf kleinen Geräten diskutiert. Auch Sicherheitsaspekte wie ein RCE-Vulnerability bei Postgres oder der Hack von TSMC sind in den aktuellen Titeln enthalten [1].
+Basierend auf dem bereitgestellten Kontext [1] lassen sich folgende Themen aus den aktuellen Überschriften der Hacker-News-Startseite identifizieren:
+
+*   **Jensen Huang & Nvidia:** Es gibt mehrere Einträge zum ehemaligen CEO Jensen Huang, darunter seine Resignation, die Anerkennung eines „Avalanches" von Exzess-Wafern und Speicherproblemen sowie Gerüchte über eine Beziehung zu einem zweiten Mitarbeiter. Zudem wird ein Petition der Mitarbeiter erwähnt, um ihn zurückzubringen [1].
+*   **KI & AI-Entwicklungen:** Es werden Themen wie die Resignation von Claude.ai (Claude Code), das Anthropic IPO, Gemini 4 Hydrogen und Edge0-145B sowie Fragen zur richtigen Menge an KI diskutiert. Zudem gibt es Hinweise auf Service-Ausfälle bei Claude [1].
+*   **Microsoft & IT-Ausfälle:** …
+*   **Software & Technik:** …
+
+Der Kontext listet diese Nachrichten auf, gibt jedoch keine explizite Rangliste der „Top-Themen" vor; die oben genannten Punkte stellen die prominentesten Einträge in diesem Feed dar.
 
 ---
 **Quellen**
@@ -152,8 +157,8 @@ Basierend auf dem bereitgestellten Kontext [1], der die Titel der Hacker-News-St
 
 - `count: 30`: Die Startseite hat 30 Titel. Nur diese Zeilen gehen in den Prompt, kein HTML.
 - Der Kontext steht in der Nutzernachricht vor deiner Frage, nicht im System-Prompt. Für das Modell sieht es aus, als hättest du die Titel selbst mitgeschickt.
-- Die Antwort fasst mehrere Titel zusammen und kann dabei ergänzen, was in keinem Titel steht, etwa wen Jensen Huang leitet. Ob ein Detail aus dem Kontext oder aus dem Trainingswissen stammt, zeigt nur der Kontext selbst (in Burp). Das Modell mischt beides; "ausschließlich" im System-Prompt verringert das nur.
-- Diesmal steht `[1]` im Text, wie der System-Prompt verlangt. Darauf verlassen kann sich der Code nicht: Im früheren Lauf fehlte es. Deshalb hängt der Code die Quellenliste selbst an.
+- Die Antwort fasst mehrere Titel zusammen und kann dabei behaupten, was in keinem Titel steht: "die Resignation von Claude.ai" vermischt "Jensen Huang resigns" mit "Elevated errors on claude.ai …". Ob ein Detail wirklich im Kontext steht, zeigt nur der Kontext selbst (in Burp). "ausschließlich" im System-Prompt verringert solche Fehler nur.
+- `[1]` steht im Text, wie der System-Prompt verlangt. Darauf verlassen kann sich der Code nicht: Ein kleines Modell befolgt solche Anweisungen nicht immer. Deshalb hängt der Code die Quellenliste selbst an.
 - Die Titel sind englisch, die Antwort ist deutsch: Der System-Prompt verlangt Deutsch.
 
 **Probier aus:** die Aufgaben im Kopf von `02-web-scraping.ts`. Achte darauf, ob das Modell Text aus dem `<scraped-context>`-Block als Daten behandelt oder als Anweisung.
@@ -189,9 +194,7 @@ Basierend auf dem bereitgestellten Kontext [1], der die Titel der Hacker-News-St
 
 **Das siehst du**
 
-Alle Blöcke dieses Teils stammen aus dem früheren Lauf mit `qwen3.8-4b-q4`; die Generalprobe hat keinen Werkzeugaufruf mitgeschnitten.
-
-Das Log nach der Frage "Wie spät ist es gerade in Berlin?":
+Das Log nach der Frage "Welcher Tag ist heute?":
 
 ```text
 … INFO Model: Call started { messages: 1 }
@@ -203,26 +206,26 @@ Das Log nach der Frage "Wie spät ist es gerade in Berlin?":
 Erste Anfrage an das Modell und seine Antwort (gekürzt):
 
 ```json
-{"model":"qwen3.8-4b-q4","temperature":0,"stream":false,
- "tools":[{"type":"function","function":{"name":"dateTime","description":"Gibt das aktuelle Datum und die Uhrzeit in Deutschland (Europe/Berlin) zurück.","parameters":{"type":"object","properties":{},"additionalProperties":false}}}],
- "messages":[{"role":"user","content":"Wie spät ist es gerade in Berlin?"}]}
+{"model":"qwen3.5-4b","temperature":0,"stream":false,
+ "tools":[{"type":"function","function":{"name":"dateTime","description":"Gibt das aktuelle Datum und die Uhrzeit in Deutschland (Europe/Berlin) zurück.","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false}}}],
+ "messages":[{"role":"user","content":"Welcher Tag ist heute?"}]}
 
 {"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"",
-  "tool_calls":[{"id":"PmGtKOd9…","type":"function","function":{"name":"dateTime","arguments":"{}"}}],
-  "reasoning":"The user is asking what time it is currently in Berlin. I have access to a dateTime function …"}}],
- "usage":{"prompt_tokens":300,"completion_tokens":63,"total_tokens":363}}
+  "reasoning_content":"The user is asking \"Which day is today?\" in German. I need to use the dateTime tool …",
+  "tool_calls":[{"type":"function","id":"eVM7aRvY…","function":{"name":"dateTime","arguments":"{}"}}]}}],
+ "usage":{"prompt_tokens":275,"completion_tokens":80,"total_tokens":355,"completion_tokens_details":{"reasoning_tokens":63}}}
 ```
 
 Zweite Anfrage (nur `messages`) und die Antwort in Open WebUI:
 
 ```json
-[{"role":"user","content":"Wie spät ist es gerade in Berlin?"},
- {"role":"assistant","content":"","tool_calls":[{"id":"PmGtKOd9…","type":"function","function":{"name":"dateTime","arguments":"{}"}}]},
- {"role":"tool","content":"Freitag, 13. November 2026 um 02:21","name":"dateTime","tool_call_id":"PmGtKOd9…"}]
+[{"role":"user","content":"Welcher Tag ist heute?"},
+ {"role":"assistant","content":"","tool_calls":[{"id":"eVM7aRvY…","type":"function","function":{"name":"dateTime","arguments":"{}"}}]},
+ {"role":"tool","content":"Freitag, 13. November 2026 um 14:54","name":"dateTime","tool_call_id":"eVM7aRvY…"}]
 ```
 
 ```text
-Es ist gerade **Freitag, 13. November 2026 um 02:21 Uhr** in Berlin.
+Heute ist Freitag, der 13. November 2026.
 ```
 
 **Was bedeutet das?**
@@ -230,7 +233,7 @@ Es ist gerade **Freitag, 13. November 2026 um 02:21 Uhr** in Berlin.
 - Eine Frage, zwei Anfragen an das Modell. Auf die erste antwortet es nicht mit Text, sondern mit `finish_reason: "tool_calls"` und dem Wunsch, `dateTime` mit `{}` aufzurufen.
 - Ausgeführt hat die Funktion dein Code (`Tool dateTime: called`), nicht das Modell. Ein Modell kann nur Text erzeugen; der Tool-Call ist eine Bitte.
 - In der zweiten Anfrage stehen der Tool-Call und das Ergebnis mit derselben ID im Verlauf. Daraus formuliert das Modell die Antwort.
-- Die Werkzeugbeschreibung geht bei jeder Anfrage mit: 300 Prompt-Tokens für eine Frage aus sechs Wörtern.
+- Die Werkzeugbeschreibung geht bei jeder Anfrage mit: 275 Prompt-Tokens für eine Frage aus vier Wörtern.
 - Aus dem zod-Schema `z.object({}).strict()` wird JSON Schema (das Format, in dem die API Argumente beschreibt) mit `additionalProperties: false`: kein einziges Argument erlaubt.
 
 **Probier aus:** die Aufgaben im Kopf von `03-tool-call-base.ts`. Achte im Log auf die Zeile `The model requested tools` und die Rundennummer.
@@ -262,7 +265,7 @@ Es ist gerade **Freitag, 13. November 2026 um 02:21 Uhr** in Berlin.
 
 **Das siehst du**
 
-Wie in Teil 3: früherer Lauf mit `qwen3.8-4b-q4`.
+Log und Antwort nach derselben Frage wie in Teil 3:
 
 ```text
 … INFO Model: Call started { messages: 1 }
@@ -271,7 +274,7 @@ Wie in Teil 3: früherer Lauf mit `qwen3.8-4b-q4`.
 ```
 
 ```text
-Es ist gerade **Freitag, 13. November 2026 um 02:21 Uhr** in Berlin.
+Heute ist Freitag, der 13. November 2026.
 ```
 
 **Was bedeutet das?**

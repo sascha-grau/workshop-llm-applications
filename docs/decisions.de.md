@@ -6,7 +6,7 @@ Kurze Entscheidungsprotokolle: Kontext, Entscheidung, Folgen. Jede Überschrift 
 
 | Anker | Thema |
 |---|---|
-| [kein-structured-output](#kein-structured-output) | JSON nur per Prompt, kein `withStructuredOutput` |
+| [kein-structured-output](#kein-structured-output) | JSON per Prompt; nur der Judge von `faithful` versucht `json_schema` |
 | [judge-huelle](#judge-huelle) | `promptfoo-judge.ts` als Hülle um den Judge |
 | [eigene-faithful-pruefung](#eigene-faithful-pruefung) | Eigene Prüfung `faithful` statt `context-faithfulness` |
 | [fassade-gepinnt](#fassade-gepinnt) | `ollama-api-facade-js` auf eine feste Version gepinnt |
@@ -29,6 +29,8 @@ Kurze Entscheidungsprotokolle: Kontext, Entscheidung, Folgen. Jede Überschrift 
 **Entscheidung:** Der Prompt verlangt nur JSON. `stripJsonFence` entfernt einen Markdown-Zaun, ein zod-Schema prüft das Ergebnis. Belege: Kommentare in `lessons/04-chunking/04-question-generation-chunking.ts` und `lessons/08-evaluations/evaluation.ts`.
 
 **Folgen:** Ungültiges JSON ist ein normaler Fall: Lektion 04, Teil 4 überspringt den Chunk, Reranking fällt auf -1 zurück, Multi-Query bricht die Frage ab, Lektion 08 meldet "no usable verdict" bzw. "judge format error".
+
+**Änderung für `faithful`:** Auf LM Studio scheiterten fünf Zellen von Lektion 08, Teil 5 an ungültigem JSON des Judge (`qwen3.5-4b`, gemessen am 2026-11-13): zweimal stand ein verirrtes Backtick hinter dem JSON, dreimal standen unmaskierte ASCII-Anführungszeichen neben „…“ in einem Text. Deshalb fordert `promptfoo-faithfulness.ts` bei ausgeschaltetem Denken strikte strukturierte Ausgabe (`json_schema`). Ist sie leer oder ungültig oder lehnt der Server `response_format` ab, gilt der bisherige Klartext-Prompt mit derselben zod-Prüfung (zwei Formatversuche plus ein Versuch für den Rückfall; das Modellobjekt merkt sich den Klartextmodus). Das JSON wird nie aus dem Feld `reasoning` gelesen. Belege: Auf LM Studio lief der volle Lauf ohne `ERROR` (vorher fünf). Auf dem Server des Autors (`qwen3.8-4b-q4`, ignoriert `reasoning_effort: none`) liegt das JSON bei strukturierter Ausgabe im Feld `reasoning`, der Rückfall greift, und ein Einzeltest lief ohne Fehler. Für Chat-Antworten und alle anderen JSON-Aufrufe bleibt es beim Prompt.
 
 ## judge-huelle
 

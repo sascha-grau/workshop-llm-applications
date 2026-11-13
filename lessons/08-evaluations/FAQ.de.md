@@ -27,19 +27,19 @@ Teil 6 hat nur zwei Prüfungen, `source-hit` (in der Quellenliste unter der Antw
 
 ## Woran scheitern die Zellen wirklich?
 
-Zahlen aus dem [Messlauf 2026-11-13](GUIDE.de.md#messlauf-2026-11-13) im Guide. In seinen 29 gescheiterten Zellen schlugen diese Prüfungen fehl (eine Zelle kann mehrere haben):
+Zahlen aus dem [Messlauf 2026-11-13](GUIDE.de.md#messlauf-2026-11-13) im Guide. In seinen 32 gescheiterten Zellen schlugen diese Prüfungen fehl (eine Zelle kann mehrere haben):
 
 | Gescheiterte Prüfung | in so vielen Zellen | davon als **einzige** Ursache |
 |---|---|---|
-| `faithful` | 20 | 12 |
-| `correct` | 17 | 9 |
+| `faithful` | 22 | 12 |
+| `correct` | 20 | 10 |
 | `source-hit` und `mrr` (immer zusammen) | 3 | 0 |
 
 Daraus folgt:
 
 1. **Die Hauptgründe sind `faithful` und `correct`**, nicht die Suche. Die richtigen Dokumente werden fast immer gefunden (Spalte `source-hit` im Messlauf).
 2. **`source-hit` scheitert nur bei F-05**, in drei der vier Strategien. Dort fehlt das erwartete Dokument wirklich unter den Treffern.
-3. **`faithful` scheitert mal knapp, mal deutlich.** Knapp: 18 von 19, 12 von 13, 11 von 12 Aussagen gedeckt. Deutlich vor allem, wenn die Antwort sagt, was die Quellen _nicht_ enthalten: Bei F-10 ("OWASP nennt keine Zahlen") scheiterte `faithful` in drei Strategien mit 1 von 2 oder 2 von 6, `correct` bestand dort überall.
+3. **`faithful` scheitert mal knapp, mal deutlich.** Knapp: 13 von 14, 12 von 13, 11 von 12 Aussagen gedeckt. Deutlich vor allem, wenn die Antwort sagt, was die Quellen _nicht_ enthalten: Bei F-10 ("OWASP nennt keine Zahlen") scheiterte `faithful` in drei Strategien mit 1 von 2 oder 2 von 6, `correct` bestand dort überall.
 
 ## Warum `correct` scheitert, obwohl das Thema stimmt
 
@@ -84,7 +84,7 @@ Manchmal irrt auch der Judge und markiert eine belegte Aussage als ungedeckt. Im
 |---|---|---|
 | `[PASS]` | Alle Prüfungen der Zelle bestanden. | Nichts. |
 | `[FAIL]` | Mindestens eine Prüfung ist gescheitert. Die Zelle zeigt die Begründung jeder Prüfung. | Prüfen, _welche_ Prüfung scheiterte (siehe unten). |
-| `[ERROR]` mit `judge format error` | Der Judge hat zweimal kein gültiges JSON geliefert. Das sagt nichts über die Antwort. | Einzelfälle hinnehmen, mit einem 4B-Judge sind sie zu erwarten; bei vielen ein stärkeres Modell als Judge nehmen. |
+| `[ERROR]` mit `judge format error` | Der Judge hat auch nach mehreren Versuchen kein gültiges JSON geliefert. Das sagt nichts über die Antwort. | Einzelfälle hinnehmen (mit strukturierter Ausgabe selten); bei vielen ein stärkeres Modell als Judge nehmen. |
 | `[ERROR]` mit `Context size has been exceeded` | LM Studio bedient mehrere Anfragen parallel, und der Kontext reicht nicht für jede. | Das Chat-Modell mit Parallel 1 laden ([Vorher prüfen](GUIDE.de.md#vorher-prüfen) im Guide). |
 | `[ERROR]` mit `did not answer within … s` | Der Judge war zu langsam. | `timeout` im Judge-Block der YAML-Datei erhöhen. |
 | `[ERROR]` mit `Cannot load index` | Ein Index fehlt. | Die Indizes aus Lektion 04 erzeugen (`npm run l04:0` bis `l04:4`). |

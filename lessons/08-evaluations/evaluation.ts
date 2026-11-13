@@ -4,7 +4,7 @@
 import type { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 import { stripVTControlCharacters } from 'node:util';
-import { remoteEmbeddingModel, remoteModel } from '../shared/config.ts';
+import { remoteEmbeddingModel, remoteModel, settings } from '../shared/config.ts';
 import { createJsonChatModel } from '../shared/chat-model.ts';
 import { embeddingQuery } from '../shared/embeddings.ts';
 import { logInvocation } from '../shared/logging.ts';
@@ -134,26 +134,56 @@ export async function retrieveContext(
 
 // Der Judge hat das Format verfehlt (leer, abgeschnitten, kein JSON, falsche Form). Eigene Klasse,
 // damit nur Formatfehler einen zweiten Versuch bekommen (promptfoo-faithfulness.ts), Zeitfehler nicht.
-export class JudgeFormatError extends Error {}
+// `retryWithoutSchema`: Die strukturierte Ausgabe hat nicht funktioniert (leer, ungültig, vom Server abgelehnt).
+export class JudgeFormatError extends Error {
+  readonly retryWithoutSchema: boolean;
+
+  constructor(message: string, retryWithoutSchema = false) {
+    super(message);
+    this.retryWithoutSchema = retryWithoutSchema;
+  }
+}
 
 // Fragt den Judge und prüft sein JSON mit `schema`. Leere, abgeschnittene oder ungültige Antworten werfen
-// `JudgeFormatError`; die Meldungen zitieren die Antwort nicht.
+// `JudgeFormatError`; die Meldungen zitieren die Antwort nicht. Mit `jsonSchema` (nur bei ausgeschaltetem Denken)
+// wird strukturierte Ausgabe verlangt; sonst, oder nach `retryWithoutSchema`, gilt der Klartext-Prompt.
 export async function askJudgeJson<T>(
   model: Pick<ChatOpenAI, 'invoke'>, systemPrompt: string, userContent: string, schema: z.ZodType<T>,
-  { expectedFormat, truncationHint = "Raise the server's output limit, or use a model that thinks less.", timeout }: {
-    expectedFormat?: string; truncationHint?: string; timeout?: number;
+  { expectedFormat, truncationHint = "Raise the server's output limit, or use a model that thinks less.", timeout, jsonSchema = false }: {
+    expectedFormat?: string; truncationHint?: string; timeout?: number; jsonSchema?: boolean;
   } = {},
 ): Promise<T> {
-  const formatError = (message: string) => new JudgeFormatError(`${message}${expectedFormat ? ` Expected ${expectedFormat}.` : ''}`);
+  const useJsonSchema = jsonSchema && !settings.showThinking;
+  const formatError = (message: string, retryWithoutSchema = useJsonSchema) =>
+    new JudgeFormatError(`${message}${expectedFormat ? ` Expected ${expectedFormat}.` : ''}`, retryWithoutSchema);
+  const truncated = () => formatError(`The judge response was truncated (finish_reason: length). ${truncationHint}`, false);
   const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
   // Bei Zeitablauf den Grund (`TimeoutError`) werfen statt LangChains Abbruchfehler: Daran erkennt
   // promptfoo-judge.ts die Zeitüberschreitung.
-  const response = await model.invoke([['system', systemPrompt], ['user', userContent]], { signal }).catch((error) => {
+  // Strukturierte Ausgabe ist nur ein Versuch: Manche Server lehnen sie ab oder liefern das JSON im Feld
+  // `reasoning`. Das JSON wird nie aus den Denkschritten gelesen, stattdessen folgt der Klartext-Rückfall.
+  const response = await model.invoke([['system', systemPrompt], ['user', userContent]], {
+    signal,
+    ...(useJsonSchema ? {
+      response_format: {
+        type: 'json_schema' as const,
+        json_schema: { name: 'judge_response', strict: true, schema: z.toJSONSchema(schema) },
+      },
+    } : {}),
+  }).catch((error) => {
     if (signal?.aborted) throw signal.reason;
+    if (useJsonSchema && error instanceof SyntaxError) throw formatError('The judge did not return valid JSON.');
+    if (useJsonSchema && error instanceof Error && error.constructor.name === 'LengthFinishReasonError') throw truncated();
+    if (useJsonSchema && error instanceof Error && 'status' in error && (error.status === 400 || error.status === 422)
+      && (('param' in error && typeof error.param === 'string' && error.param.startsWith('response_format'))
+        || (/\b(?:response_format|json_schema)\b/i.test(error.message)
+          && /\b(?:unsupported|not supported|not implemented|invalid|unrecognized|unknown|must be|not available)\b/i.test(error.message)))) {
+      throw formatError('The judge server rejected JSON Schema response formatting.');
+    }
     throw error;
   });
   if (response.response_metadata?.finish_reason === 'length') {
-    throw formatError(`The judge response was truncated (finish_reason: length). ${truncationHint}`);
+    throw truncated();
   }
   const text = modelText(response);
   if (!text.trim()) throw formatError('The judge returned an empty answer.');

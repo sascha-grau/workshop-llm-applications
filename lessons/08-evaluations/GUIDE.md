@@ -291,16 +291,10 @@ The trial run (`npm run l08:5 -- --filter-first-n 1`) sends only the first quest
 
 ### Measurement run 2026-11-13
 
-The full run `npm run l08:5` (44 cells; LM Studio on an RTX 3080 Ti, `qwen3.5-4b` as chat model and judge, loaded with Parallel 1 and context 8192; `text-embedding-multilingual-e5-base`) took 6 min 59 s, just under 10 seconds per cell. Result: 10 cells passed, 29 failed, 5 ended with `ERROR`. With your own GPU you start it yourself; otherwise the trainer shows the report of a run started beforehand.
+The full run `npm run l08:5` (44 cells; LM Studio on an RTX 3080 Ti, `qwen3.5-4b` as chat model and judge, loaded with Parallel 1 and context 8192; `text-embedding-multilingual-e5-base`) took 5 min 46 s, just under 8 seconds per cell. Result: 12 cells passed, 32 failed, none ended with `ERROR`. With your own GPU you start it yourself; otherwise the trainer shows the report of a run started beforehand.
 
 ```
 Running 44 test cases (up to 1 at a time)...
-Assertion grading failed during eval
-{
-  "error": "Error: judge format error (statement extraction) after 2 attempts: The judge did not return valid JSON.\n    at askWithRetry (…)",
-  …
-}
-…   (one such block per ERROR cell)
 ┌─────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┬─────────────────┐
 │ query           │ keyPoint        │ expectedSources │ [corpus:prepar… │ [corpus:headin… │ [corpus:semant… │ [corpus:questi… │
 ├─────────────────┼─────────────────┼─────────────────┼─────────────────┼─────────────────┼─────────────────┼─────────────────┤
@@ -308,23 +302,23 @@ Assertion grading failed during eval
 │ den OWASP Top   │ Verbrauch       │                 │ OWASP Top 10    │ OWASP Top 10    │ OWASP Top 10    │ OWASP Top 10    │
 │ …               │ …               │                 │ …               │ …               │ …               │ …               │
 └─────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┴─────────────────┘
-✓ Eval complete (ID: eval-cOV-2026-11-13T09:23:01)
+✓ Eval complete (ID: eval-5xX-2026-11-13T14:24:21)
 Results:
-  ✓ 10 passed (22.73%)
-  ✗ 29 failed (65.91%)
-  ✗ 5 errors (11.36%)
-Duration: 6m 59s (concurrency: 1)
+  ✓ 12 passed (27.27%)
+  ✗ 32 failed (72.73%)
+  0 errors (0%)
+Duration: 5m 46s (concurrency: 1)
 Writing output to results/lesson-08-promptfoo/05-promptfoo-strategies.html
 ```
 
 | Provider | Cells passed | `source-hit` | `mrr` | `faithful` | `correct` | Errors |
 |---|---|---|---|---|---|---|
-| `corpus:prepared` | 2/11 | 0.90 | 0.73 | 0.83 | 0.68 | 1 |
-| `corpus:headings` | 3/11 | 0.91 | 0.85 | 0.83 | 0.69 | 0 |
-| `corpus:semantic` | 3/11 | 0.90 | 0.83 | 0.85 | 0.55 | 1 |
-| `corpus:questions` | 2/11 | 1.00 | 0.92 | 0.92 | 0.69 | 3 |
+| `corpus:prepared` | 2/11 | 0.91 | 0.76 | 0.86 | 0.62 | 0 |
+| `corpus:headings` | 3/11 | 0.91 | 0.85 | 0.76 | 0.69 | 0 |
+| `corpus:semantic` | 4/11 | 0.91 | 0.84 | 0.85 | 0.59 | 0 |
+| `corpus:questions` | 3/11 | 1.00 | 0.89 | 0.88 | 0.73 | 0 |
 
-The means are over the graded cells; an error cell has no check results. For `corpus:questions` this leaves out three questions (F-05, F-07, F-08). Recomputed from the answers' metadata over all eleven questions, its MRR is 0.89; the hit ratio stays 1.00. All five errors were `judge format error (statement extraction)` after two attempts: when splitting the answer into statements, the judge returned invalid JSON twice. With a judge of the 4B class, such single cases are to be expected. Which checks failed in the red cells is broken down in the [FAQ](FAQ.md#what-actually-makes-cells-fail).
+The means are over all eleven cells of a column; in this run no cell ended with `ERROR`. `source-hit` is 0.91 and misses only F-05; only `corpus:questions` also finds F-05 (1.00). For `faithful` the judge returned valid JSON throughout: as long as `SHOW_THINKING` is off, the step requests structured output and falls back to plain JSON when needed (reasons: [docs/decisions.md](../../docs/decisions.md#kein-structured-output)). Which checks failed in the red cells is broken down in the [FAQ](FAQ.md#what-actually-makes-cells-fail).
 
 **What does it mean?**
 
@@ -349,7 +343,7 @@ The means are over the graded cells; an error cell has no check results. For `co
 | Message in the cell or terminal | Fix |
 |---|---|
 | `[ERROR] Cannot load index … Generate it with npm run l04:0, then npm run l04:N.` | Create the missing index. The other columns keep running. |
-| `[ERROR] … judge format error (…) after 2 attempts: …` | The judge failed to keep to the JSON format twice. With a 4B judge such as `qwen3.5-4b` a few such cells are to be expected (see [measurement run](#measurement-run-2026-11-13)); accept them. If many, put a stronger model into the judge block. |
+| `[ERROR] … judge format error (…) after … attempts: …` | The judge did not keep to the JSON format even after several attempts. With the structured output of `faithful` this is rare (see [measurement run](#measurement-run-2026-11-13)); accept single cases. If many, put a stronger model into the judge block. |
 | `[ERROR] … 400 "Engine protocol predict stream returned an error: … Context size has been exceeded. …"`, in the terminal after `Assertion grading failed during eval` | The chat model is loaded with several parallel requests (LM Studio default: Parallel 4); then the context is not enough for each. Reload it with Parallel 1 (see [Check first](#check-first)) and start the run again. |
 | `[ERROR] The judge did not answer within … s (timeout in the judge block of the YAML).` | Raise `timeout` in the judge block. |
 | `[ERROR] Request timed out.` (without "judge") | Not the judge but the assistant: its answer took longer than `MODEL_TIMEOUT_MS` in `evaluation.ts`. This happens when the server is under load (other runs, model switch in LM Studio). Run again (`-- --resume`) or raise `MODEL_TIMEOUT_MS`. |
@@ -358,7 +352,7 @@ The means are over the graded cells; an error cell has no check results. For `co
 
 > **Deep dive: why does `promptfoo-judge.ts` exist?** promptfoo inserts `{{ env.X }}` as text, and its OpenAI adapter would treat the text `"false"` for `showThinking` as true. The wrapper therefore sets a real boolean, asks for `reasoning_effort: none` and limits the time per verdict (`timeout`) for the judge only. Both judge checks thus use the same block. Basis for `timeout` and `max_tokens`: a thinking judge needed up to about 2200 tokens per verdict at roughly 8 tokens per second (measured on 2026-11-12 with `qwen3.8-4b-q4`). The trade-off: [docs/decisions.md](../../docs/decisions.md#judge-huelle).
 
-> **Deep dive: `faithful` like RAGAS.** [RAGAS](https://docs.ragas.io/) is a widely used framework for evaluating RAG. Its faithfulness metric splits the answer into statements and checks each against the context. [`promptfoo-faithfulness.ts`](promptfoo-faithfulness.ts) does that in two JSON steps with a strictly checked schema and a second attempt on format errors. promptfoo's built-in `context-faithfulness` check read plain-text verdicts: thinking steps ended up in the statement lists, and format errors silently counted as 0. See [docs/decisions.md](../../docs/decisions.md#eigene-faithful-pruefung) and the RAGAS paper under [Further reading](../../docs/production.md#further-reading).
+> **Deep dive: `faithful` like RAGAS.** [RAGAS](https://docs.ragas.io/) is a widely used framework for evaluating RAG. Its faithfulness metric splits the answer into statements and checks each against the context. [`promptfoo-faithfulness.ts`](promptfoo-faithfulness.ts) does that in two JSON steps with a strictly checked schema and a second attempt on format errors. As long as `SHOW_THINKING` is off, each step first requests structured output (`json_schema`); if the server returns it empty or rejects it, the plain-text prompt with the same check applies. Reason: the judge occasionally wrote invalid JSON, for example a stray backtick after the JSON or unescaped quotation marks next to „…“ inside a text. The JSON is never read from the thinking. promptfoo's built-in `context-faithfulness` check read plain-text verdicts: thinking steps ended up in the statement lists, and format errors silently counted as 0. See [docs/decisions.md](../../docs/decisions.md#eigene-faithful-pruefung) and the RAGAS paper under [Further reading](../../docs/production.md#further-reading).
 
 ## Part 6 – The running facade as a black box
 

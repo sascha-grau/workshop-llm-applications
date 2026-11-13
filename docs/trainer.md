@@ -152,7 +152,7 @@ Assumptions: times per lesson as below ("Duration (plan)"), i.e. explanation plu
 | 14:00–15:30 | Lesson 04 – Chunking | – |
 | 15:30–15:45 | Break | `docker start qdrant`, `npm run l06:1` (seconds; after Lesson 04 in case indexes were rebuilt) |
 | 15:45–16:45 | Lesson 05 – Retrieval strategies | – |
-| 16:45–17:00 | Review | Trainer in the evening: full `npm run l08:5` for the report (dress rehearsal: 6 min 59 s) |
+| 16:45–17:00 | Review | Trainer in the evening: full `npm run l08:5` for the report (dress rehearsal: 5 min 46 s) |
 
 | Day 2 | Block | Runs in the background |
 |---|---|---|
@@ -170,7 +170,7 @@ On the evening before the workshop the trainer builds all indexes (`l04:4` about
 
 ## Lessons
 
-The tables follow the tasks in the file headers (number = task). Run times and expected results come from the dress rehearsal (see above) unless noted otherwise. Rows marked "earlier run" were not re-measured; they come from 2026-11-13 with `qwen3.8-4b-q4` over an OpenAI-compatible server. Rows without a number ("read it off") were not measured. Output that belongs to no task is in the lesson's guide ("What you see").
+The tables follow the tasks in the file headers (number = task). Run times and expected results come from the dress rehearsal (see above) unless noted otherwise. The rows of Lessons 01 and 02 come from the dress rehearsal (LM Studio, `qwen3.5-4b`, 2026-11-13); the requests were recorded with a logging forwarder equivalent to Burp. Rows marked "earlier run" were not re-measured; they come from 2026-11-13 with `qwen3.8-4b-q4` over an OpenAI-compatible server. Rows without a number ("read it off") were not measured. Output that belongs to no task is in the lesson's guide ("What you see").
 
 ### 01 – Preparation
 
@@ -189,9 +189,9 @@ The tables follow the tasks in the file headers (number = task). Run times and e
 | 2.1 | Per message `HTTP request started/completed` and `Model: Call started/completed`. Measured with curl: `GET /api/tags` twice, one `POST /api/chat`, `messages: 1`; Open WebUI adds helper requests (see 2.3). |
 | 2.2 | The new `ADVERTISED_MODEL` appears in the dropdown after reloading. |
 | 2.3 | The whole history, plus Open WebUI helper requests with `### Task:` (title, tags). |
-| 3.1 | In the JSON body (`messages`) of the request to `/v1/chat/completions` (earlier run). |
-| 3.2 | The model answers the edited text. You have until `MODEL_TIMEOUT_MS` to edit before the call aborts (earlier run). |
-| 3.3 | Burp shows many `data:` lines instead of one JSON object (earlier run). |
+| 3.1 | In the JSON body (`messages`) of the request to `/v1/chat/completions`. The response contains `usage` (prompt 21, completion 243, of which 228 thinking); here the field with the thinking is called `reasoning_content` (other servers: `reasoning`). |
+| 3.2 | The model answers the edited text. You have until `MODEL_TIMEOUT_MS` to edit before the call aborts (expected behaviour, not measured: Intercept needs real Burp). |
+| 3.3 | The request contains `"stream":true,"stream_options":{"include_usage":true}`; the response is `text/event-stream` with about 223 `data:` lines, the last with `usage` (21/232, of which 219 thinking), then `data: [DONE]`. |
 
 ### 02 – Tool calls
 
@@ -206,14 +206,14 @@ The tables follow the tasks in the file headers (number = task). Run times and e
 |---|---|
 | 1.1 | "Im vorliegenden Text steht nichts darüber, wie alt Ano Nym ist." (The text says nothing about Ano Nym's age.) A correct refusal, but without the examples' "(Quelle: Kontext)" ending; the appended list names "[1] Kontext im System-Prompt (Ano Nym)". |
 | 1.2 | Without the examples, the format and "(Quelle: Kontext)" get lost or vary. |
-| 1.3 | The system prompt is the first message in the body; with `temperature` 1 the answers vary (earlier run). |
-| 2.1 | The fetch of `news.ycombinator.com` is in the HTTP history (earlier run). Dress rehearsal: 30 titles, the answer cites [1] three times. |
+| 1.3 | The system prompt is the first message in the body. With `temperature` 0: prompt 215, completion 3729 (of which 3612 thinking), about 28 s. With `temperature` 1 (three runs, 23 to 42 s) the wording varies; the third answer dropped "(Quelle: Kontext)" and added a conference sentence. |
+| 2.1 | The fetch of `news.ycombinator.com` is in the HTTP history (fetch 537 ms). 30 titles, the answer cites [1] five times; the model takes about 20 s (prompt 493, completion 2588, of which 2210 thinking). |
 | 2.2 | The instruction may work; more likely without `<scraped-context>`. |
 | 2.3 | The browser loads the image URL including the question (network tab); Burp does not see it, as it only sees Node's traffic. Remedy: do not render images and links from model output, or allow only known targets; the workshop's source list uses inline code for this reason (`formatSourceList`). |
-| 3.1 | `tools` in the request, `tool_calls` in the response (earlier run). |
+| 3.1 | `tools` in the request, `tool_calls` in the response: first `finish_reason` `tool_calls` with `dateTime` and `{}` (usage 275/80/355, of which 63 thinking); the second request sends the assistant message with `tool_calls` and the tool message with the same ID ("Freitag, 13. November 2026 um 14:54"; usage 326/85/411). Answer: "Heute ist Freitag, der 13. November 2026.", about 4.4 s. |
 | 3.2 | Before: "Würfle eine Zahl zwischen 1 und 6." (Roll a number between 1 and 6.) triggers no tool call; the model invents "4 🎲", the same number every time at `temperature` 0. With the tool: `toolsByName` needs `[randomNumber.name, randomNumber]`. |
-| 3.3 | The tool runs, then the error "The model was still requesting tools after 1 rounds." (earlier run). |
-| 4.1 | Identical except for `"name":"model"`, which LangChain adds to the assistant message with `tool_calls`; both parts send two model requests (earlier run). |
+| 3.3 | One model call (`The model requested tools { round: 1 }`), the tool runs, then `ERROR Model: Call failed – Cause: The model was still requesting tools after 1 rounds.`; the client gets `{"error":"Die Anfrage an die Fassade ist fehlgeschlagen. Prüfe die Server-Logs."}`. |
+| 4.1 | Identical except for `"name":"model"`, which LangChain adds to the assistant message with `tool_calls`; both parts send two model requests with the same tools and the same usage (275/80, 326/85); Part 4 takes about 1.4 s. |
 | 4.2 | `answerWithTools` had 62 lines. The agent takes over the loop: find the tool by name, match results by tool-call ID, round limit (`recursionLimit`). |
 | 4.3 | One entry in the `tools` array; before that, Part 4 also invents the dice number (see 3.2). |
 
@@ -254,7 +254,7 @@ The tables follow the tasks in the file headers (number = task). Run times and e
 | 0.3 | Clearly more chunks. If the value stays set, Parts 1 to 4 reject the manifest (limit ≠ 512). |
 | 1.1 | The hits lie in the prompt-injection document (jailbreaking is covered there). |
 | 1.2 | Read it off; the result depends on the chosen document. |
-| 1.3 | The link lists `--007` and `--008` with 2.8 and 2.9 characters per token (URLs break into many small tokens); corpus minimum 2.51 (earlier run). |
+| 1.3 | The link lists `--007` and `--008` with 2.8 and 2.9 characters per token (URLs break into many small tokens); corpus minimum 2.51 (same token counts as with the exact tokenizer, so independent of the server). |
 | 2.1 | Part 1, rank 1: `--003` (0.871) mixes multimodality and the first mitigations, an averaged vector. Part 2, rank 1: "1. Begrenzen Sie das Modellverhalten" (Constrain model behaviour, 0.885), a small single-topic chunk. |
 | 2.2 | Fewer, larger chunks; hits become more mixed (read it off). |
 | 2.3 | Embedding much faster (one document instead of twelve). |
@@ -375,7 +375,7 @@ The tables follow the tasks in the file headers (number = task). Run times and e
 | | |
 |---|---|
 | Duration (plan) | 90 minutes: intro 5, Part 1 10, Part 2 15, Part 3 15, Part 4 10, Part 5 25, Part 6 10 |
-| Run time (dress rehearsal) | Part 1 under 1 s, Part 2 4 s, Part 3 6 s, Part 4 1 s, Part 5 full 6 min 59 s, Part 6 with `--filter-first-n 1` about 22 s; judge check passed in Parts 2 and 3 |
+| Run time (dress rehearsal) | Part 1 under 1 s, Part 2 4 s, Part 3 6 s, Part 4 1 s, Part 5 full 5 min 46 s, Part 6 with `--filter-first-n 1` about 22 s; judge check passed in Parts 2 and 3 |
 | At the start | `git status`; check `SHOW_THINKING`, `ALL_DOCUMENTS`, `BURP_PROXY_URL` in `.env`. |
 | Parts 5 and 6 in the workshop | Participants with their own GPU run the full `npm run l08:5` themselves. On slow laptops or a shared server the trainer shows the report created beforehand, and participants run only `--filter-first-n 1`. |
 | Beforehand | Index `headings` (Parts 1–4), all four (Part 5); for Part 6 Qdrant, `l06:1` and `l07:11` in a second terminal (`l07:8` is enough without task 2) |
